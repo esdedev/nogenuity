@@ -1,0 +1,17 @@
+#!/bin/sh
+# Apply the udev rule now, so the headset works without unplugging it
+set -e
+if [ "$1" = "configure" ]; then
+    # A copy in /etc (from the app's Grant access button or install.sh) would hide the packaged rule
+    # in /usr/lib, and with it any headset a later version adds. Remove it if Nogenuity wrote it.
+    ETC_RULE=/etc/udev/rules.d/70-nogenuity.rules
+    if [ -f "$ETC_RULE" ] && head -n 1 "$ETC_RULE" | grep -q '^# Nogenuity:'; then
+        rm -f "$ETC_RULE"
+        echo "Nogenuity: removed $ETC_RULE, the package's rule in /usr/lib/udev/rules.d replaces it."
+    fi
+    if command -v udevadm >/dev/null 2>&1; then
+        udevadm control --reload-rules || true
+        udevadm trigger --subsystem-match=hidraw --action=change || true
+    fi
+fi
+#DEBHELPER#

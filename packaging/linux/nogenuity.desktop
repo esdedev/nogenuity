@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=Nogenuity
+GenericName=Headset control
+GenericName[es]=Control del auricular
+Comment=Open control for HyperX headsets: 7.1, equalizer, mic monitoring
+Comment[es]=Control libre para auriculares HyperX: 7.1, ecualizador, mic monitoring
+Exec=nogenuity
+TryExec=nogenuity
+Icon=nogenuity
+Terminal=false
+Categories=Settings;HardwareSettings;
+Keywords=HyperX;headset;headphones;equalizer;EQ;surround;sidetone;microphone;
+Keywords[es]=HyperX;auricular;cascos;ecualizador;EQ;envolvente;micrófono;
+StartupWMClass=nogenuity

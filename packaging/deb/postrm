@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+    if command -v udevadm >/dev/null 2>&1; then
+        udevadm control --reload-rules || true
+        # Drop the access the removed rule gave to a headset that is still plugged in
+        udevadm trigger --subsystem-match=hidraw --action=change || true
+    fi
+fi
+#DEBHELPER#

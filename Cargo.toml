@@ -1,0 +1,78 @@
+[package]
+name = "nogenuity"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+description = "Nogenuity: open control for HyperX headsets on Windows and Linux"
+license = "GPL-3.0-only"
+repository = "https://github.com/esdedev/nogenuity"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "=0.2.191"
+slint = { version = "=1.18.1", default-features = false, features = ["std", "backend-winit", "renderer-software", "compat-1-2"] }
+ksni = { version = "=0.3.7", default-features = false, features = ["blocking", "async-io"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-numerics = "=0.3.1"
+
+[target.'cfg(windows)'.dependencies.windows]
+version = "=0.62.2"
+features = [
+    "Win32_Foundation",
+    "Win32_Devices_DeviceAndDriverInstallation",
+    "Win32_Devices_FunctionDiscovery",
+    "Win32_Devices_HumanInterfaceDevice",
+    "Win32_Devices_Properties",
+    "Win32_Graphics_Direct2D",
+    "Win32_Graphics_Direct2D_Common",
+    "Win32_Graphics_DirectWrite",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Globalization",
+    "Win32_Graphics_Gdi",
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_Endpoints",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_IO",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_System_Variant",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_PropertiesSystem",
+    "Win32_UI_WindowsAndMessaging",
+]
+
+# .deb package (cargo-deb), built by the release workflow from the glibc 2.31 binary
+[package.metadata.deb]
+maintainer = "esdedev <esdedev@users.noreply.github.com>"
+copyright = "Nogenuity contributors"
+extended-description = """Nogenuity controls HyperX gaming headsets without NGENUITY: 7.1 surround, a parametric equalizer, mic monitoring and its level, mic mute status, battery and charging, auto power-off, voice prompts and the game/chat balance, each where the headset supports it. It lives in the system tray and restores your settings whenever the headset is plugged in or switched on."""
+section = "sound"
+priority = "optional"
+# Explicit: $auto would take libc6 >= 2.34 from the build host, but the binary needs only 2.31.
+# winit loads the X11 / Wayland libraries at run time (dlopen), so they are listed by hand too.
+depends = "libc6 (>= 2.31), libfontconfig1 (>= 2.12.6), libxkbcommon0, libxkbcommon-x11-0, libx11-6, libx11-xcb1, libxcb1, libxcursor1, libxrandr2, libxi6, libwayland-client0"
+recommends = "pulseaudio-utils"
+maintainer-scripts = "packaging/deb/"
+assets = [
+    ["target/release/nogenuity", "usr/bin/", "755"],
+    ["packaging/linux/nogenuity.desktop", "usr/share/applications/", "644"],
+    ["packaging/linux/70-nogenuity.rules", "usr/lib/udev/rules.d/", "644"],
+    # Every size make_icons.py generates (the path under hicolor/ is kept)
+    ["packaging/linux/icons/hicolor/**/nogenuity.*", "usr/share/icons/hicolor/", "644"],
+    ["README.md", "usr/share/doc/nogenuity/", "644"],
+    ["CONTRIBUTING.md", "usr/share/doc/nogenuity/", "644"],
+]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

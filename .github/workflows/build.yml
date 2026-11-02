@@ -1,0 +1,197 @@
+# Builds and tests Nogenuity on Windows and Linux. It never runs on its own, to save Actions minutes:
+# start it by hand (Actions -> Build -> Run workflow) or push a v* tag, which also creates a draft
+# GitHub release with the binaries; publish it by hand after checking it.
+name: Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  RUST_VERSION: "1.99.1"
+  # Linux release binary: linked against glibc 2.31 (Ubuntu 20.04, Debian 11 and newer)
+  ZIG_VERSION: "0.14.1"
+  # From https://ziglang.org/download/index.json
+  ZIG_SHA256: "24aeeec8af16c381934a6cd7d95c807a8cb2cf7df9fa40d359aa884195c4716c"
+  CARGO_ZIGBUILD_VERSION: "0.24.0"
+  CARGO_DEB_VERSION: "3.8.0"
+  # AppImage tools, checked against the SHA256 digests GitHub publishes for these release assets
+  APPIMAGETOOL_URL: "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage"
+  APPIMAGETOOL_SHA256: "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
+  APPIMAGE_RUNTIME_URL: "https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64"
+  APPIMAGE_RUNTIME_SHA256: "2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d"
+  GLIBC_TARGET: "2.31"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Cheap check first: a tag that doesn't match Cargo.toml fails before any build minute is spent
+  version:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Tag matches Cargo.toml
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match version $VERSION in Cargo.toml"
+            exit 1
+          fi
+
+  windows:
+    needs: version
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: windows-${{ env.RUST_VERSION }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: windows-${{ env.RUST_VERSION }}-
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install $env:RUST_VERSION --profile minimal
+          rustup default $env:RUST_VERSION
+      - name: Test
+        run: cargo test --locked
+      - name: Build
+        run: |
+          cargo build --release --locked
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item target/release/nogenuity.exe dist/Nogenuity.exe
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows
+          path: dist/Nogenuity.exe
+          if-no-files-found: error
+
+  linux:
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin/cargo-zigbuild
+            ~/.cargo/bin/cargo-deb
+            target
+          key: linux-${{ env.RUST_VERSION }}-zigbuild${{ env.CARGO_ZIGBUILD_VERSION }}-deb${{ env.CARGO_DEB_VERSION }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: linux-${{ env.RUST_VERSION }}-zigbuild${{ env.CARGO_ZIGBUILD_VERSION }}-deb${{ env.CARGO_DEB_VERSION }}-
+      - name: System libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libfontconfig1-dev libxkbcommon-dev
+      - name: Rust toolchain, Zig and cargo-zigbuild
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal
+          rustup default "$RUST_VERSION"
+          curl -sSfL "https://ziglang.org/download/$ZIG_VERSION/zig-x86_64-linux-$ZIG_VERSION.tar.xz" -o zig.tar.xz
+          echo "$ZIG_SHA256  zig.tar.xz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/zig" && tar -xJf zig.tar.xz -C "$RUNNER_TEMP/zig" --strip-components=1 && rm zig.tar.xz
+          echo "$RUNNER_TEMP/zig" >> "$GITHUB_PATH"
+          # Cached between runs: only compiled the first time
+          cargo zigbuild --version 2>/dev/null | grep -qF "$CARGO_ZIGBUILD_VERSION" \
+            || cargo install --locked cargo-zigbuild --version "$CARGO_ZIGBUILD_VERSION"
+          cargo deb --version 2>/dev/null | grep -qF "$CARGO_DEB_VERSION"             || cargo install --locked cargo-deb --version "$CARGO_DEB_VERSION"
+      - name: Test
+        run: cargo test --locked
+      - name: Build (glibc ${{ env.GLIBC_TARGET }})
+        run: cargo zigbuild --release --locked --target "x86_64-unknown-linux-gnu.$GLIBC_TARGET"
+      - name: Check the newest glibc symbol
+        run: |
+          set -o pipefail
+          BIN=target/x86_64-unknown-linux-gnu/release/nogenuity
+          MAX=$(objdump -T "$BIN" | grep -o 'GLIBC_[0-9][0-9.]*' | sed 's/GLIBC_//' | sort -Vu | tail -1)
+          echo "Newest glibc symbol: $MAX"
+          if [ -z "$MAX" ]; then
+            echo "::error::No glibc symbols found in $BIN"
+            exit 1
+          fi
+          if [ "$(printf '%s\n%s\n' "$MAX" "$GLIBC_TARGET" | sort -V | tail -1)" != "$GLIBC_TARGET" ]; then
+            echo "::error::The binary needs glibc $MAX, newer than $GLIBC_TARGET"
+            exit 1
+          fi
+      - name: Libraries resolve on Ubuntu 20.04 (glibc 2.31)
+        run: |
+          docker run --rm -v "$PWD/target/x86_64-unknown-linux-gnu/release/nogenuity:/nogenuity:ro" ubuntu:20.04 sh -ec '
+            export DEBIAN_FRONTEND=noninteractive
+            for i in 1 2 3; do
+              apt-get update -qq >/dev/null && apt-get install -y -qq libfontconfig1 >/dev/null && break
+              echo "apt failed (attempt $i), retrying"; sleep 10
+            done
+            dpkg -s libfontconfig1 >/dev/null || { echo "::error::Could not install libfontconfig1 in the container"; exit 1; }
+            ldd /nogenuity
+            ! ldd /nogenuity | grep -q "not found"'
+      - name: Package
+        run: |
+          VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          sh packaging/linux/package.sh target/x86_64-unknown-linux-gnu/release/nogenuity "$VERSION" dist
+          cargo deb --no-build --no-strip --target x86_64-unknown-linux-gnu --output dist
+      - name: AppImage
+        run: |
+          VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          T="$RUNNER_TEMP/appimage"; mkdir -p "$T"
+          curl -sSfL "$APPIMAGETOOL_URL" -o "$T/appimagetool"
+          curl -sSfL "$APPIMAGE_RUNTIME_URL" -o "$T/runtime"
+          echo "$APPIMAGETOOL_SHA256  $T/appimagetool" | sha256sum -c -
+          echo "$APPIMAGE_RUNTIME_SHA256  $T/runtime" | sha256sum -c -
+          chmod +x "$T/appimagetool"
+          sh packaging/linux/appimage.sh target/x86_64-unknown-linux-gnu/release/nogenuity "$VERSION" dist "$T/appimagetool" "$T/runtime"
+      - name: Check the AppImage
+        run: |
+          IMG=$(ls dist/*.AppImage)
+          chmod +x "$IMG"
+          (cd "$RUNNER_TEMP" && "$GITHUB_WORKSPACE/$IMG" --appimage-extract >/dev/null)
+          R="$RUNNER_TEMP/squashfs-root"
+          test -x "$R/AppRun" && test -x "$R/usr/bin/nogenuity" && test -f "$R/nogenuity.desktop"
+          ! grep -q '^TryExec=' "$R/nogenuity.desktop"
+          ! ldd "$R/usr/bin/nogenuity" | grep -q "not found"
+          echo "AppImage OK: $(du -h "$IMG" | cut -f1)"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux
+          path: |
+            dist/*.tar.gz
+            dist/*.deb
+            dist/*.AppImage
+          if-no-files-found: error
+
+  release:
+    # Only for a pushed tag: a manual run on a tag rebuilds the artifacts without touching the release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, linux]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --draft --verify-tag \
+            --title "Nogenuity ${GITHUB_REF_NAME#v}" --generate-notes

@@ -1,0 +1,80 @@
+name: Device report
+description: Tell us how Nogenuity works with your HyperX headset (especially models marked EXPERIMENTAL).
+title: "[Device report] "
+labels: ["device report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing! Nogenuity never updates firmware, and testing a model only sends the commands
+        documented for it in docs/PROTOCOL.md.
+
+        **Easiest way:** in Nogenuity, click **Send report** at the bottom of the window. It saves
+        `nogenuity-report.txt` (app version, OS, USB ID, firmware and the HID log, no personal data) and opens
+        this form: drag the file into the box at the end.
+  - type: input
+    id: model
+    attributes:
+      label: Headset model
+      description: As shown at the top of the Nogenuity window, or the name on the box.
+      placeholder: HyperX Cloud Flight S
+    validations:
+      required: true
+  - type: input
+    id: usb-id
+    attributes:
+      label: USB ID
+      description: >-
+        It's in the report file. Without Nogenuity: `lsusb` on Linux, or Device Manager → the headset →
+        Details → Hardware IDs on Windows (e.g. `VID_0951&PID_16EA` → `0951:16EA`).
+      placeholder: "0951:16EA"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Nogenuity version
+      placeholder: "0.1.0"
+  - type: checkboxes
+    id: works
+    attributes:
+      label: What works
+      description: Tick what you checked and works. Leave unticked what doesn't, or what your headset doesn't have.
+      options:
+        - label: The headset is detected (green "Connected")
+        - label: 7.1 surround switch turns surround on and off
+        - label: The switch shows the right 7.1 state after changing it on the headset
+        - label: Mic monitoring switch turns it on and off
+        - label: The switch shows the right mic monitoring state
+        - label: The microphone indicator shows when the mic is muted
+        - label: Moving an EQ point changes the sound (with 7.1 on, if the app asks for it)
+        - label: Battery level is shown and looks right
+        - label: Charging shows while the headset charges
+        - label: Switching the headset off shows HEADSET OFF (wireless models), and switching it on reconnects
+        - label: The mic monitoring level slider changes how loud you hear yourself
+        - label: Auto power-off turns the headset off after the chosen time
+        - label: Voice prompts switch turns the announcements on and off
+        - label: Settings come back after unplugging and plugging the headset in again
+  - type: textarea
+    id: problems
+    attributes:
+      label: What doesn't work, or looks wrong
+      description: Which control, what you did, what happened, what you expected.
+  - type: textarea
+    id: report
+    attributes:
+      label: Report file
+      description: Drag `nogenuity-report.txt` here (Nogenuity → Send report).
+    validations:
+      required: true

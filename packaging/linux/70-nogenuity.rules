@@ -1,0 +1,49 @@
+# Nogenuity: let the logged-in user talk to supported HyperX headsets
+# (/dev/hidraw) without root.
+#
+# Install:
+#   sudo cp 70-nogenuity.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+# then unplug and plug the headset back in.
+#
+# uaccess grants access to the user of the active desktop session; the plugdev group covers
+# setups without a seat (e.g. WSL, SSH), where the user is usually a member of that group.
+# Distributions without a plugdev group (Arch, Fedora) should drop GROUP="plugdev"; the
+# Grant access button of Nogenuity and install.sh do that automatically.
+# HyperX Cloud Alpha S
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0951", ATTRS{idProduct}=="16ed", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+# HyperX Cloud Alpha S, HP-era ID (experimental)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="0c91", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+# HyperX Cloud Flight S (experimental)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0951", ATTRS{idProduct}=="16ea", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+# HyperX Cloud II Wireless (experimental)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0951", ATTRS{idProduct}=="1718", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="0c8a", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+# HyperX Cloud Alpha Wireless (experimental)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0951", ATTRS{idProduct}=="1743", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0951", ATTRS{idProduct}=="1765", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="098d", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+# HyperX Cloud II Wireless DTS (experimental)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="018b", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="0696", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="038b", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="058b", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+# HyperX Cloud Flight Wireless (experimental)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0951", ATTRS{idProduct}=="16c4", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0951", ATTRS{idProduct}=="1723", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="0e90", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+# HyperX Cloud Stinger Core Wireless (experimental)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0951", ATTRS{idProduct}=="170b", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+# HyperX Cloud Stinger 2 Wireless (experimental)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="0d93", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+# HyperX Cloud III Wireless (experimental)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="0c9d", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="05b7", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="0e9d", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="06b7", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+# HyperX Cloud II Core Wireless (experimental)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="0995", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="069f", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+# HyperX Cloud III (experimental)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="089d", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="03cc", TAG+="uaccess", GROUP="plugdev", MODE="0660"
