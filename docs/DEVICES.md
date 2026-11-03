@@ -23,7 +23,7 @@ Status legend:
 | Cloud II Core Wireless | | ✔ | Wireless control set (`66`) | `03F0:0995`, `03F0:069F` ² | **Experimental** (battery, mic, mic monitoring and level, auto power-off) | [#3](../../../issues/3) |
 | Cloud Stinger 2 Wireless | | ✔ | Wireless control set (DTS) | `03F0:0D93` | **Experimental** (battery, mic monitoring, auto power-off) | [#3](../../../issues/3) |
 | Cloud III Wireless | ✔ | | Wireless control set (`66`) | `03F0:05B7`, `03F0:0C9D`, `03F0:06B7`, `03F0:0E9D` | **Experimental** (battery, mic, mic monitoring and level, auto power-off) | [#3](../../../issues/3) |
-| Cloud III (wired) | ✔ | | Feature `20` | `03F0:089D`, `03F0:03CC` | **Experimental** (mic monitoring) | [#3](../../../issues/3) |
+| Cloud III (wired) | ✔ | | Feature `20` | `03F0:089D`, `03F0:03CC`, `03F0:0ACE` | **Experimental** (mic monitoring and level) | [#3](../../../issues/3) |
 | Cloud MIX 2 | | ✔ | MIX | `03F0:0FAE` | Researched | [#4](../../../issues/4) |
 | Cloud MIX Buds | | ✔ | MIX | `03F0:078A` | Researched | [#4](../../../issues/4) |
 | Cloud MIX Buds 2 | | ✔ | MIX | `03F0:039E` | Researched | [#4](../../../issues/4) |
@@ -67,7 +67,7 @@ The control interface is written as in the Windows HID path: `MI_xx` is the USB 
 | Cloud Alpha Wireless | `0951:1743`, `0951:1765`, `03F0:098D` | `MI_03&Col01` | HeadsetControl (`098D`) |
 | Cloud II Core Wireless | `03F0:0995`, `03F0:069F` ² | `MI_03&Col02` | — |
 | Cloud Stinger 2 Wireless | `03F0:0D93` | `MI_03&Col03` | — |
-| Cloud III (wired) | `03F0:089D` | `MI_03&Col02` | HeadsetControl (also `03F0:03CC`) |
+| Cloud III (wired) | `03F0:089D`, `03F0:03CC`, `03F0:0ACE` | `MI_03`, usage page `0x01C0`, usage 1 (`Col02` on `089D`) | HeadsetControl (`089D`, `03CC`) |
 | Cloud III Wireless | `03F0:05B7`, `03F0:0C9D` | `MI_03&Col01` | — |
 | | `03F0:06B7`, `03F0:0E9D` | whole device | — |
 | Cloud MIX Buds | `03F0:078A` | `MI_03&Col04` (+ `Col05` notifications) | — |

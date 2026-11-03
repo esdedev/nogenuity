@@ -71,7 +71,8 @@ pub struct Model {
     /// Report size, for when the system does not report it (Linux).
     pub report_len: usize,
     /// HID usage page of the control collection, if it must be required (0 = any vendor page,
-    /// 0xFF00 or above). Only Windows distinguishes collections within an interface.
+    /// 0xFF00 or above). Only Windows distinguishes collections within an interface, so a model
+    /// with a page below that range needs it here to be found at all.
     pub usage_page: u16,
     /// Number of the control collection (`ColNN` in the Windows path) if it must be required;
     /// 0 = the first one that matches.
@@ -195,6 +196,7 @@ pub const MODELS: &[&Model] = &[
     &wireless::CLOUD_II_CORE_WIRELESS_2,
     &cloud3_wired::CLOUD_III,
     &cloud3_wired::CLOUD_III_2,
+    &cloud3_wired::CLOUD_III_3,
 ];
 
 /// Model by its name (the one stored in the settings).
