@@ -257,11 +257,17 @@ Wireless).
 
 ## Cloud III (wired): feature report `20`
 
-`03F0:089D`, `MI_03&Col02` (HeadsetControl also lists `03F0:03CC`). Only mic monitoring:
-SET_FEATURE `20 <command> <value>`; for a read Nogenuity waits 500 ms and does GET_FEATURE `20`, value in
-byte 2. Read sidetone `06` (1 = on), read gain `05`; set sidetone `86` + 0/1. Turning it on, Nogenuity
-first reads the gain and, if it isn't `F0`, sets `85 F0` and saves it with `87 01` (gains seem to range
-`C4` … `FA`, probably -60 … -6 dB); HeadsetControl just sends `20 86 01`.
+**Not verified on hardware.** `03F0:089D` (`MI_03&Col02`), `03F0:03CC` and `03F0:0ACE`, usage page `0x01C0`,
+usage 1. The page is below the usual `0xFF00` vendor range, so on Windows it has to be asked for by value. That
+`0ACE` has the same interface and commands as the other two is an assumption.
+
+Mic monitoring and its level: SET_FEATURE `20 <command> <value>`; for a read Nogenuity waits 500 ms and does
+GET_FEATURE `20`, value in byte 2. Read sidetone `06` (1 = on), read gain `05`; set sidetone `86` + 0/1, set gain
+`85` + gain. Valid gains are `C4` … `FA` (probably -60 … -6 dB); the level slider covers that range.
+
+Turning mic monitoring on, Nogenuity first reads the gain and, only if it's out of range, sets `85 F0` and saves it
+with `87 01`. HeadsetControl just sends `20 86 01`. A level set from the slider isn't saved on the headset: the
+app sets it again on connect.
 
 ## Basic models: Cloud Flight Wireless and Cloud Stinger Core Wireless
 

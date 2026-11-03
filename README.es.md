@@ -50,7 +50,7 @@ directamente con los cascos, con el protocolo documentado en [docs/PROTOCOL.md](
 | HyperX Cloud III Wireless | `03F0:0C9D`, `03F0:05B7`, `03F0:0E9D`, `03F0:06B7` | Experimental: batería y carga, estado del micro, mic monitoring y su volumen, apagado automático, cascos apagados; sin probar |
 | HyperX Cloud II Core Wireless | `03F0:0995`, `03F0:069F` | Experimental: batería y carga, estado del micro, mic monitoring y su volumen, apagado automático, cascos apagados; sin probar |
 | HyperX Cloud Stinger 2 Wireless | `03F0:0D93` | Experimental: batería y carga, mic monitoring, apagado automático, cascos apagados; sin probar |
-| HyperX Cloud III (con cable) | `03F0:089D`, `03F0:03CC` | Experimental: mic monitoring; sin probar |
+| HyperX Cloud III (con cable) | `03F0:089D`, `03F0:03CC`, `03F0:0ACE` | Experimental: mic monitoring y su nivel; sin probar |
 
 **Experimental** quiere decir que el modelo está hecho pero nadie lo ha confirmado aún con unos cascos de
 verdad. Si tienes uno, [ayuda a probarlo](CONTRIBUTING.md#testing-a-headset): los modelos experimentales

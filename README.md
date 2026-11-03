@@ -49,7 +49,7 @@ the headset directly, using the protocol documented in [docs/PROTOCOL.md](docs/P
 | HyperX Cloud III Wireless | `03F0:0C9D`, `03F0:05B7`, `03F0:0E9D`, `03F0:06B7` | Experimental: battery and charging, mic mute status, mic monitoring and its level, auto power-off, headset off; not tested yet |
 | HyperX Cloud II Core Wireless | `03F0:0995`, `03F0:069F` | Experimental: battery and charging, mic mute status, mic monitoring and its level, auto power-off, headset off; not tested yet |
 | HyperX Cloud Stinger 2 Wireless | `03F0:0D93` | Experimental: battery and charging, mic monitoring, auto power-off, headset off; not tested yet |
-| HyperX Cloud III (wired) | `03F0:089D`, `03F0:03CC` | Experimental: mic monitoring; not tested yet |
+| HyperX Cloud III (wired) | `03F0:089D`, `03F0:03CC`, `03F0:0ACE` | Experimental: mic monitoring and its level; not tested yet |
 
 **Experimental** means the model is implemented but nobody has confirmed it on a real headset yet. If you
 own one, [help test it](CONTRIBUTING.md#testing-a-headset): an experimental model has a **Send report** link

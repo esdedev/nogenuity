@@ -47,3 +47,4 @@ SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="069f", TAG+="ua
 # HyperX Cloud III (experimental)
 SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="089d", TAG+="uaccess", GROUP="plugdev", MODE="0660"
 SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="03cc", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="0ace", TAG+="uaccess", GROUP="plugdev", MODE="0660"
