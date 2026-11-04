@@ -271,8 +271,10 @@ app sets it again on connect.
 
 ## Basic models: Cloud Flight Wireless and Cloud Stinger Core Wireless
 
-**Not verified on hardware.** They only report battery, charging and whether the headset is on (the USB
-dongle stays plugged in); neither has controls Nogenuity can show.
+They only report battery, charging and whether the headset is on (the USB dongle stays plugged in); neither
+has controls Nogenuity can show. **Not verified with Nogenuity on hardware.** The Cloud Flight Wireless notes
+are unconfirmed; the Cloud Stinger Core Wireless ones were checked on Linux by a tester with their own tool,
+except the full state (`06`) and the percentage curve.
 
 **Cloud Flight Wireless** (`0951:16C4`, `0951:1723`, `03F0:0E90`, interface 3, `Col03`):
 
@@ -287,11 +289,19 @@ dongle stays plugged in); neither has controls Nogenuity can show.
 **Cloud Stinger Core Wireless** (`0951:170B`, the dongle, interface 3, `Col03`):
 
 - Feature reports, ID `FF`, both ways: SET_FEATURE with the request (padded to the descriptor's feature
-  size), wait 20 ms, GET_FEATURE `FF`. Offsets below include the ID byte.
-- Headset on: request `FF 07 00 FD 04 00 00 02 82 03 05 29 0F 00 00 03 68 10 00 00`, reply byte 11 = 1.
+  size), then GET_FEATURE `FF` until the reply is ready. Offsets below include the ID byte.
+- Reply time varies: about 3 ms for the headset-on request and 28 ms for the battery on the tester's unit.
+  Until then GET_FEATURE returns the previous reply, so a fixed 20 ms wait reads stale data. Nogenuity polls
+  every 5 ms for up to 1 s.
+- A fresh reply has byte 3 = `FE`, byte 2 ≠ 0, and bytes 4-5 equal to request bytes 5 and 4. A reply that has
+  been read comes back with bytes 1-2 = `01 00`.
+- Headset on: request `FF 07 00 FD 04 00 00 02 82 03 05 29 0F 00 00 03 68 10 00 00`, reply byte 11 = 1 (`03`
+  when the headset is off and the dongle is plugged in). With the headset off, the battery request gets no
+  fresh reply, so Nogenuity doesn't send it then.
 - Battery: request `FF 07 00 FD 04 0C F1 02 01 04 F0 0C` (byte 6 `F1` = dongle). Reply byte 9 = charge
   state (`03` not charging, `05` charging, `06` full; other values are ignored), bytes 11-12 = voltage in
-  mV, little-endian.
+  mV, little-endian. Bytes 13-14 were `00 00` when not charging and `E0 02` while charging; their meaning is
+  unknown.
 - The reading bounces for a few seconds when the cable is pulled, so leaving a charging state is only
   taken after four equal readings in a row, keeping the previous battery meanwhile.
 - On Linux, hidraw doesn't give the feature size: Nogenuity reads it from the HID report descriptor (the

@@ -125,6 +125,37 @@ impl HidLink {
         ok.then_some(buf)
     }
 
+    /// GET_FEATURE of report `id` every `every` until `is_reply` accepts one, or until `timeout`.
+    /// Only the outcome goes to the log, so the retries don't push older lines out of the report.
+    pub fn poll_feature(
+        &self,
+        id: u8,
+        every: Duration,
+        timeout: Duration,
+        is_reply: impl Fn(&[u8]) -> bool,
+    ) -> Option<Vec<u8>> {
+        let start = Instant::now();
+        let mut last = None;
+        let reply = poll(every, timeout, || {
+            let mut buf = self.feature(id);
+            if !self.transport.get_feature(&mut buf) {
+                return None;
+            }
+            if is_reply(&buf) {
+                return Some(buf);
+            }
+            last = Some(buf);
+            None
+        });
+        let ms = start.elapsed().as_millis();
+        log(&match (&reply, &last) {
+            (Some(r), _) => format!("<= {} (after {ms} ms)", hex(&r[..24.min(r.len())])),
+            (None, Some(r)) => format!("<= no fresh reply after {ms} ms, last {}", hex(&r[..24.min(r.len())])),
+            (None, None) => format!("<= no reply after {ms} ms"),
+        });
+        reply
+    }
+
     /// Serializes commands with other processes using the headset.
     pub fn lock(&self) -> Res<CommandLock> {
         CommandLock::take().ok_or(HidError(t().busy))
@@ -215,5 +246,53 @@ impl HidLink {
         }
         log(&format!("<< {}", hex(&buf[..12.min(buf.len())])));
         Some(buf)
+    }
+}
+
+/// Waits `every` and calls `read`, again and again, until it gives a value or `timeout` has passed.
+fn poll<T>(every: Duration, timeout: Duration, mut read: impl FnMut() -> Option<T>) -> Option<T> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        std::thread::sleep(every);
+        if let Some(value) = read() {
+            return Some(value);
+        }
+        if Instant::now() >= deadline {
+            return None;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const EVERY: Duration = Duration::from_millis(1);
+
+    #[test]
+    fn poll_keeps_reading_until_a_value_arrives() {
+        let mut reads = 0;
+        let value = poll(EVERY, Duration::from_secs(5), || {
+            reads += 1;
+            (reads == 3).then_some("fresh")
+        });
+        assert_eq!(value, Some("fresh"));
+        assert_eq!(reads, 3);
+    }
+
+    #[test]
+    fn poll_gives_up_after_the_timeout() {
+        let timeout = Duration::from_millis(30);
+        let start = Instant::now();
+        let value: Option<u8> = poll(EVERY, timeout, || None);
+        assert_eq!(value, None);
+        assert!(start.elapsed() >= timeout);
+    }
+
+    #[test]
+    fn poll_waits_before_the_first_read() {
+        let every = Duration::from_millis(20);
+        let start = Instant::now();
+        assert_eq!(poll(every, Duration::from_secs(5), || Some(start.elapsed())).map(|t| t >= every), Some(true));
     }
 }
