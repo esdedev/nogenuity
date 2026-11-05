@@ -94,12 +94,12 @@ pub fn refresh(audio: &mut Option<GameChat>, levels: &mut (f32, f32), unapplied:
         *unapplied = true;
         return;
     }
-    if std::mem::take(unapplied) {
-        if let Some(wanted) = wanted_levels(settings) {
-            outputs.set(wanted.0, wanted.1);
-            *levels = wanted;
-            return;
-        }
+    if std::mem::take(unapplied)
+        && let Some(wanted) = wanted_levels(settings)
+    {
+        outputs.set(wanted.0, wanted.1);
+        *levels = wanted;
+        return;
     }
     match outputs.get() {
         Some(now) => {
