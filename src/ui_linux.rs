@@ -1291,9 +1291,13 @@ pub fn claim_single_instance() -> bool {
 }
 
 pub fn run(start_hidden: bool) {
-    // Same id as the .desktop (StartupWMClass): the dock groups the window with its icon
-    let _ = slint::set_xdg_app_id("nogenuity");
     let window = AppWindow::new().expect("could not create the window");
+    // Same id as the .desktop (StartupWMClass): the dock groups the window with its icon. It goes
+    // here because Slint refuses it until creating a window has set up its platform, and it has to
+    // be set before the window is shown.
+    if let Err(e) = slint::set_xdg_app_id("nogenuity") {
+        crate::hid::log(&format!("app id: {e}"));
+    }
     let tr = t();
     window.set_app_icon(app_icon());
     window.set_t_subtitle(tr.subtitle.into());
