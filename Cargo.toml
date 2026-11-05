@@ -73,6 +73,41 @@ assets = [
     ["CONTRIBUTING.md", "usr/share/doc/nogenuity/", "644"],
 ]
 
+# .rpm package (cargo-generate-rpm), built by packaging/linux/rpm.sh from the same binary
+[package.metadata.generate-rpm]
+# Explicit for the same reasons as the .deb: glibc from the build host, and libraries winit loads at run time
+auto-req = "no"
+post_install_script = "packaging/rpm/post_install.sh"
+post_uninstall_script = "packaging/rpm/post_uninstall.sh"
+assets = [
+    { source = "target/release/nogenuity", dest = "/usr/bin/nogenuity", mode = "755" },
+    { source = "packaging/linux/nogenuity.desktop", dest = "/usr/share/applications/nogenuity.desktop", mode = "644" },
+    # Written by rpm.sh: the rule without the plugdev group
+    { source = "target/rpm/70-nogenuity.rules", dest = "/usr/lib/udev/rules.d/70-nogenuity.rules", mode = "644" },
+    { source = "packaging/linux/alsa-card-profile/paths/nogenuity-alpha-s-game.conf", dest = "/usr/share/alsa-card-profile/mixer/paths/nogenuity-alpha-s-game.conf", mode = "644" },
+    { source = "packaging/linux/alsa-card-profile/paths/nogenuity-alpha-s-chat.conf", dest = "/usr/share/alsa-card-profile/mixer/paths/nogenuity-alpha-s-chat.conf", mode = "644" },
+    { source = "packaging/linux/alsa-card-profile/profile-sets/nogenuity-alpha-s.conf", dest = "/usr/share/alsa-card-profile/mixer/profile-sets/nogenuity-alpha-s.conf", mode = "644" },
+    { source = "packaging/linux/icons/hicolor/*/apps/nogenuity.*", dest = "/usr/share/icons/hicolor/", mode = "644" },
+    { source = "README.md", dest = "/usr/share/doc/nogenuity/README.md", mode = "644", doc = true },
+    { source = "CONTRIBUTING.md", dest = "/usr/share/doc/nogenuity/CONTRIBUTING.md", mode = "644", doc = true },
+]
+
+[package.metadata.generate-rpm.requires]
+glibc = ">= 2.31"
+fontconfig = "*"
+libxkbcommon = "*"
+libxkbcommon-x11 = "*"
+libX11 = "*"
+libX11-xcb = "*"
+libxcb = "*"
+libXcursor = "*"
+libXrandr = "*"
+libXi = "*"
+libwayland-client = "*"
+
+[package.metadata.generate-rpm.recommends]
+pulseaudio-utils = "*"
+
 [profile.release]
 opt-level = 3
 lto = true
