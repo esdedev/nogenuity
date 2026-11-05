@@ -2,8 +2,8 @@
 //! plugged in even when it is not). Cloud Flight Wireless (output report, reply on the interrupt
 //! endpoint) and Cloud Stinger Core Wireless (feature reports). Details in docs/PROTOCOL.md.
 //!
-//! EXPERIMENTAL: not tested with this app on hardware. A tester checked the Stinger protocol on
-//! Linux with their own tool (issue #6).
+//! EXPERIMENTAL: the Cloud Flight Wireless hasn't been tested on hardware. One tester confirmed the
+//! Stinger on Linux with this app (issue #6); Windows and the percentage curve are still unchecked.
 
 use std::cell::Cell;
 use std::time::Duration;
@@ -134,7 +134,7 @@ const STINGER_CONNECTIVITY: [u8; 20] =
 /// charge state, bytes 11-12 = voltage in mV (little-endian).
 const STINGER_BATTERY: [u8; 12] = [0xFF, 0x07, 0x00, 0xFD, 0x04, 0x0C, 0xF1, 0x02, 0x01, 0x04, 0xF0, 0x0C];
 /// How often GET_FEATURE is retried after SET_FEATURE, and for how long. The battery reply took
-/// about 28 ms on a tester's unit, the connectivity one about 3 ms.
+/// 23-39 ms on a tester's unit, the connectivity one 5-7 ms.
 const STINGER_POLL: Duration = Duration::from_millis(5);
 const STINGER_TIMEOUT: Duration = Duration::from_millis(1000);
 

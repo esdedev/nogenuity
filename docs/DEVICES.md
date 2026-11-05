@@ -31,7 +31,7 @@ Status legend:
 | Cloud Flight 2 Wireless | ✔ | | Universal | `03F0:0AC1`, `03F0:0BC1`, `03F0:06C1`, `03F0:0CC1` | Researched | [#5](../../../issues/5) |
 | Cloud Alpha 2 Wireless | ✔ | | Universal? | `03F0:0ABE`, `03F0:0BBE`, `03F0:08BE` | Not started | — |
 | Cloud Flight Wireless | | ✔ | Basic | `0951:16C4`, `0951:1723`, `03F0:0E90` | **Experimental** (battery, headset off) | [#6](../../../issues/6) |
-| Cloud Stinger Core Wireless (+ 7.1) | | ✔ | Basic | `0951:170B` | **Experimental** (battery, headset off) | [#6](../../../issues/6) |
+| Cloud Stinger Core Wireless (+ 7.1) | | ✔ | Basic | `0951:170B` | **Experimental** (battery, headset off; confirmed on Linux, percentage approximate) | [#6](../../../issues/6) |
 | Cloud Stinger S | | ✔ | — | `0951:1715` | Nothing to control over USB ³ | [#6](../../../issues/6) |
 | Cloud Stinger Core + 7.1 | | ✔ | — | `0951:1709` | Nothing to control over USB ³ | [#6](../../../issues/6) |
 

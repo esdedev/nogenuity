@@ -45,7 +45,7 @@ the headset directly, using the protocol documented in [docs/PROTOCOL.md](docs/P
 | HyperX Cloud Alpha Wireless | `0951:1743`, `0951:1765`, `03F0:098D` | Experimental: battery and charging, mic mute status, mic monitoring and its level, auto power-off, voice prompts, headset off; not tested yet |
 | HyperX Cloud II Wireless DTS | `03F0:018B`, `03F0:0696`, `03F0:038B`, `03F0:058B` | Experimental: battery and charging, mic mute status, mic monitoring, auto power-off, headset off; not tested yet |
 | HyperX Cloud Flight Wireless | `0951:16C4`, `0951:1723`, `03F0:0E90` | Experimental: battery and charging, headset off; not tested yet |
-| HyperX Cloud Stinger Core Wireless | `0951:170B` | Experimental: battery and charging, headset off; not tested yet |
+| HyperX Cloud Stinger Core Wireless | `0951:170B` | Experimental: battery and charging, headset off; confirmed on Linux, percentage approximate |
 | HyperX Cloud III Wireless | `03F0:0C9D`, `03F0:05B7`, `03F0:0E9D`, `03F0:06B7` | Experimental: battery and charging, mic mute status, mic monitoring and its level, auto power-off, headset off; not tested yet |
 | HyperX Cloud II Core Wireless | `03F0:0995`, `03F0:069F` | Experimental: battery and charging, mic mute status, mic monitoring and its level, auto power-off, headset off; not tested yet |
 | HyperX Cloud Stinger 2 Wireless | `03F0:0D93` | Experimental: battery and charging, mic monitoring, auto power-off, headset off; not tested yet |
