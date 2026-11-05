@@ -73,18 +73,33 @@ pub fn step(value: i32, balance: i32, base: Option<(f32, f32)>, settled: bool, r
             None => return Move::Unreadable,
         },
     };
-    let levels = (base.0 * (1.0 - value.max(0) as f32 / 100.0), base.1 * (1.0 - (-value).max(0) as f32 / 100.0));
-    Move::To(Step { value, base, levels })
+    Move::To(Step { value, base, levels: levels_at(value, base) })
+}
+
+/// The volumes for a position of the slider.
+fn levels_at(value: i32, base: (f32, f32)) -> (f32, f32) {
+    (base.0 * (1.0 - value.max(0) as f32 / 100.0), base.1 * (1.0 - (-value).max(0) as f32 / 100.0))
 }
 
 /// Brings `levels` up to date. Outputs that can't be read, or that refused a write, are dropped: the
-/// window then says they're missing, and the next status update looks for them again. Returns
-/// whether a write failed, in which case the volumes aren't what the slider says.
-pub fn refresh(audio: &mut Option<GameChat>, levels: &mut (f32, f32)) -> bool {
-    let Some(outputs) = audio else { return false };
+/// window then says they're missing, and the next status update looks for them again.
+///
+/// A refused write leaves the volumes different from what the slider says, which `unapplied` keeps
+/// in mind: once outputs are back they get what the slider says. Taking whatever they're at as the
+/// new center instead would lose the base for good, since they may be lowered by the balance.
+pub fn refresh(audio: &mut Option<GameChat>, levels: &mut (f32, f32), unapplied: &mut bool, settings: &Settings) {
+    let Some(outputs) = audio else { return };
     if outputs.take_write_failure() {
         *audio = None;
-        return true;
+        *unapplied = true;
+        return;
+    }
+    if std::mem::take(unapplied) {
+        if let Some(wanted) = wanted_levels(settings) {
+            outputs.set(wanted.0, wanted.1);
+            *levels = wanted;
+            return;
+        }
     }
     match outputs.get() {
         Some(now) => {
@@ -93,13 +108,11 @@ pub fn refresh(audio: &mut Option<GameChat>, levels: &mut (f32, f32)) -> bool {
         }
         None => *audio = None,
     }
-    false
 }
 
-/// After a failed write: whatever the volumes are now becomes the new center, read on the next move.
-pub fn recenter(settings: &mut Settings) {
-    settings.balance = 0;
-    settings.balance_base = None;
+/// The volumes the saved balance asks for, if it has a base to work from.
+fn wanted_levels(settings: &Settings) -> Option<(f32, f32)> {
+    Some(levels_at(settings.balance, settings.balance_base?))
 }
 
 #[cfg(test)]
@@ -183,10 +196,17 @@ mod tests {
         assert!(is_new(&mut last, "other"));
     }
 
+    /// Unplugged with the slider to one side: what comes back is that position over the same base,
+    /// so returning to the center still gives the volumes from before the balance lowered them.
     #[test]
-    fn recentering_forgets_the_base() {
-        let mut settings = Settings { balance: 40, balance_base: Some(BASE), ..Settings::default() };
-        recenter(&mut settings);
-        assert_eq!((settings.balance, settings.balance_base), (0, None));
+    fn what_a_failed_write_leaves_to_apply_keeps_the_base() {
+        let settings = Settings { balance: -50, balance_base: Some(BASE), ..Settings::default() };
+        assert_eq!(wanted_levels(&settings), Some((0.8, 0.2)));
+    }
+
+    #[test]
+    fn with_no_base_there_is_nothing_to_apply() {
+        let settings = Settings { balance: 0, balance_base: None, ..Settings::default() };
+        assert_eq!(wanted_levels(&settings), None);
     }
 }

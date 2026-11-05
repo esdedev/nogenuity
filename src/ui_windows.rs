@@ -234,6 +234,8 @@ pub struct App {
     events: Receiver<Event>,
     audio: Option<GameChat>,
     win_levels: (f32, f32),
+    /// A write to the outputs failed: see `balance::refresh`.
+    balance_unapplied: bool,
     status: Option<Status>,
     conn: Conn,
     /// Connected model, or the last one that connected
@@ -385,7 +387,7 @@ impl App {
         let layout = model.map_or_else(Layout::before_connect, |m| Layout::for_caps(&m.caps));
         let mut audio = model.and_then(|m| m.caps.game_chat_outputs).and_then(GameChat::find);
         let mut win_levels = (0.0, 0.0);
-        crate::balance::refresh(&mut audio, &mut win_levels);
+        crate::balance::refresh(&mut audio, &mut win_levels, &mut false, &settings);
         let n = 220;
         let freqs: Vec<f32> = (0..n).map(|i| F_MIN * (F_MAX / F_MIN).powf(i as f32 / (n - 1) as f32)).collect();
         let curve = eq::response_db(&settings.eq, &freqs);
@@ -408,6 +410,7 @@ impl App {
             events,
             audio,
             win_levels,
+            balance_unapplied: false,
             status: None,
             conn: Conn::Searching,
             model,
@@ -583,10 +586,7 @@ impl App {
                     if self.audio.is_none() {
                         self.audio = self.outputs().and_then(GameChat::find);
                     }
-                    if crate::balance::refresh(&mut self.audio, &mut self.win_levels) {
-                        crate::balance::recenter(&mut self.settings);
-                        self.schedule_save();
-                    }
+                    crate::balance::refresh(&mut self.audio, &mut self.win_levels, &mut self.balance_unapplied, &self.settings);
                 }
                 Event::Button(b) => {
                     let tr = t();
