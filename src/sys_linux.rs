@@ -27,7 +27,8 @@ pub fn begin_scan() {
 const UDEV_RULE: &str = include_str!("../packaging/linux/70-nogenuity.rules");
 const UDEV_RULE_PATH: &str = "/etc/udev/rules.d/70-nogenuity.rules";
 /// The PipeWire profile that rule selects. PipeWire looks in /etc before its own folder.
-const AUDIO_PATH: &str = include_str!("../packaging/linux/alsa-card-profile/paths/nogenuity-alpha-s-game.conf");
+const AUDIO_GAME: &str = include_str!("../packaging/linux/alsa-card-profile/paths/nogenuity-alpha-s-game.conf");
+const AUDIO_CHAT: &str = include_str!("../packaging/linux/alsa-card-profile/paths/nogenuity-alpha-s-chat.conf");
 const AUDIO_PROFILE: &str = include_str!("../packaging/linux/alsa-card-profile/profile-sets/nogenuity-alpha-s.conf");
 const AUDIO_DIR: &str = "/etc/alsa-card-profile/mixer";
 
@@ -46,13 +47,14 @@ pub enum GrantError {
 /// Any failure exits with 3, so it isn't confused with pkexec's 126/127 codes.
 fn grant_script() -> String {
     let rule = UDEV_RULE.replace('\r', "");
-    let (audio_path, audio_profile) = (AUDIO_PATH.replace('\r', ""), AUDIO_PROFILE.replace('\r', ""));
+    let [audio_game, audio_chat, audio_profile] = [AUDIO_GAME, AUDIO_CHAT, AUDIO_PROFILE].map(|file| file.replace('\r', ""));
     format!(
         "{{ umask 022 && printf '%s' '{rule}' > {UDEV_RULE_PATH} && \
          if command -v getent > /dev/null && ! getent group plugdev > /dev/null; then \
          sed -i 's/, GROUP=\"plugdev\"//' {UDEV_RULE_PATH}; fi && \
          mkdir -p {AUDIO_DIR}/paths {AUDIO_DIR}/profile-sets && \
-         printf '%s' '{audio_path}' > {AUDIO_DIR}/paths/nogenuity-alpha-s-game.conf && \
+         printf '%s' '{audio_game}' > {AUDIO_DIR}/paths/nogenuity-alpha-s-game.conf && \
+         printf '%s' '{audio_chat}' > {AUDIO_DIR}/paths/nogenuity-alpha-s-chat.conf && \
          printf '%s' '{audio_profile}' > {AUDIO_DIR}/profile-sets/nogenuity-alpha-s.conf && \
          udevadm control --reload-rules && udevadm trigger --subsystem-match=hidraw --action=change; }} || exit 3"
     )
@@ -431,7 +433,7 @@ mod tests {
 
     #[test]
     fn grant_script_is_fixed_text() {
-        for file in [UDEV_RULE, AUDIO_PATH, AUDIO_PROFILE] {
+        for file in [UDEV_RULE, AUDIO_GAME, AUDIO_CHAT, AUDIO_PROFILE] {
             assert!(!file.contains('\''), "these files cannot contain single quotes");
         }
         let script = grant_script();
@@ -454,22 +456,24 @@ mod tests {
         let status = std::process::Command::new("sh").args(["-c", &script]).status().unwrap();
         assert!(status.success());
         let read = |path: &str| std::fs::read_to_string(root.join(path)).unwrap();
-        assert_eq!(read("etc/alsa-card-profile/mixer/paths/nogenuity-alpha-s-game.conf"), AUDIO_PATH);
+        assert_eq!(read("etc/alsa-card-profile/mixer/paths/nogenuity-alpha-s-game.conf"), AUDIO_GAME);
+        assert_eq!(read("etc/alsa-card-profile/mixer/paths/nogenuity-alpha-s-chat.conf"), AUDIO_CHAT);
         assert_eq!(read("etc/alsa-card-profile/mixer/profile-sets/nogenuity-alpha-s.conf"), AUDIO_PROFILE);
         std::fs::remove_dir_all(&root).unwrap();
     }
 
-    /// What was tested on a real headset: the rule picks this profile, Game plays on device 0 with
-    /// the control of that device, and Chat on device 1.
+    /// What was tested on a real headset: the rule picks this profile, and Game and Chat each play
+    /// on their own device, with the control of that device and their own name in the sound settings.
     #[test]
     fn audio_profile_is_the_tested_one() {
         assert!(UDEV_RULE.contains("ATTRS{idVendor}==\"0951\", ATTRS{idProduct}==\"16ed\", ENV{ACP_PROFILE_SET}=\"nogenuity-alpha-s.conf\""));
-        assert!(AUDIO_PATH.contains("[Element PCM]\n"));
-        assert!(!AUDIO_PATH.contains("PCM,1]"));
+        assert!(AUDIO_GAME.contains("[Element PCM]\n") && AUDIO_GAME.contains("description = Game\n"));
+        assert!(AUDIO_CHAT.contains("[Element PCM,1]\n") && AUDIO_CHAT.contains("description = Chat\n"));
         let mapping = |name: &str| AUDIO_PROFILE.split(&format!("[Mapping {name}]")).nth(1).unwrap().split("\n[").next().unwrap().to_string();
         let game = mapping("stereo-game-output");
         assert!(game.contains("hw:%f,0,0") && game.contains("paths-output = nogenuity-alpha-s-game"));
-        assert!(mapping("stereo-chat-output").contains("hw:%f,1,0"));
+        let chat = mapping("stereo-chat-output");
+        assert!(chat.contains("hw:%f,1,0") && chat.contains("paths-output = nogenuity-alpha-s-chat"));
         assert!(mapping("mono-chat-input").contains("hw:%f,0,0"));
     }
 

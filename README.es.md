@@ -105,7 +105,7 @@ ventana. El balance usa `pactl` (PipeWire o PulseAudio), del paquete `pulseaudio
 El balance necesita dos salidas, Game y Chat. Con PipeWire, un Cloud Alpha S solo tiene una por defecto, así que el
 `.deb`, `install.sh` y el botón **Grant access** instalan también un perfil de PipeWire para estos cascos. Se aplica
 la próxima vez que los conectes. Esto cambia cómo configura el sistema su audio: en los ajustes de sonido aparecen
-entonces dos salidas, ambas llamadas "Headphones".
+entonces dos salidas, Game y Chat.
 
 Para comprobarlo, `pactl list sinks short` debe mostrar `stereo-game-output` y `stereo-chat-output`.
 
@@ -117,6 +117,7 @@ Para comprobarlo, `pactl list sinks short` debe mostrar `stereo-game-output` y `
   ```
   sudo rm /etc/udev/rules.d/70-nogenuity.rules
   sudo rm /etc/alsa-card-profile/mixer/paths/nogenuity-alpha-s-game.conf
+  sudo rm /etc/alsa-card-profile/mixer/paths/nogenuity-alpha-s-chat.conf
   sudo rm /etc/alsa-card-profile/mixer/profile-sets/nogenuity-alpha-s.conf
   sudo udevadm control --reload-rules
   ```

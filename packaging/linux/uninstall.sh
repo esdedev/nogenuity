@@ -35,5 +35,6 @@ echo "Nogenuity removed."
 if [ -f "$RULE" ]; then
     echo "The udev rule is still in $RULE. To remove it, as root:"
     echo "  rm $RULE && udevadm control --reload-rules"
-    echo "  rm /etc/alsa-card-profile/mixer/paths/nogenuity-alpha-s-game.conf /etc/alsa-card-profile/mixer/profile-sets/nogenuity-alpha-s.conf"
+    echo "  rm /etc/alsa-card-profile/mixer/paths/nogenuity-alpha-s-game.conf /etc/alsa-card-profile/mixer/paths/nogenuity-alpha-s-chat.conf"
+    echo "  rm /etc/alsa-card-profile/mixer/profile-sets/nogenuity-alpha-s.conf"
 fi

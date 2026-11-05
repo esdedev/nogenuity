@@ -104,7 +104,7 @@ slider uses `pactl` (PipeWire or PulseAudio), from the `pulseaudio-utils` packag
 The balance needs two outputs, Game and Chat. On PipeWire a Cloud Alpha S only gets one by default, so the
 `.deb`, `install.sh` and the **Grant access** button also install a PipeWire profile for this headset. It takes
 effect the next time you plug the headset in. This changes how your system sets up its audio: in the sound
-settings it then appears as two outputs, both named "Headphones".
+settings it then appears as two outputs, Game and Chat.
 
 To check it, `pactl list sinks short` should list `stereo-game-output` and `stereo-chat-output`.
 
@@ -116,6 +116,7 @@ To check it, `pactl list sinks short` should list `stereo-game-output` and `ster
   ```
   sudo rm /etc/udev/rules.d/70-nogenuity.rules
   sudo rm /etc/alsa-card-profile/mixer/paths/nogenuity-alpha-s-game.conf
+  sudo rm /etc/alsa-card-profile/mixer/paths/nogenuity-alpha-s-chat.conf
   sudo rm /etc/alsa-card-profile/mixer/profile-sets/nogenuity-alpha-s.conf
   sudo udevadm control --reload-rules
   ```

@@ -65,6 +65,7 @@ assets = [
     ["packaging/linux/nogenuity.desktop", "usr/share/applications/", "644"],
     ["packaging/linux/70-nogenuity.rules", "usr/lib/udev/rules.d/", "644"],
     ["packaging/linux/alsa-card-profile/paths/nogenuity-alpha-s-game.conf", "usr/share/alsa-card-profile/mixer/paths/", "644"],
+    ["packaging/linux/alsa-card-profile/paths/nogenuity-alpha-s-chat.conf", "usr/share/alsa-card-profile/mixer/paths/", "644"],
     ["packaging/linux/alsa-card-profile/profile-sets/nogenuity-alpha-s.conf", "usr/share/alsa-card-profile/mixer/profile-sets/", "644"],
     # Every size make_icons.py generates (the path under hicolor/ is kept)
     ["packaging/linux/icons/hicolor/**/nogenuity.*", "usr/share/icons/hicolor/", "644"],
