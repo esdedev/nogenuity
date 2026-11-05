@@ -80,6 +80,7 @@ jobs:
           if-no-files-found: error
 
   linux:
+    name: linux (${{ matrix.arch }})
     needs: version
     strategy:
       # One architecture failing doesn't hide the result of the other
@@ -170,13 +171,14 @@ jobs:
           sh packaging/linux/rpm.sh "$TARGET" dist
       - name: Check the .rpm on Fedora
         run: |
-          docker run --rm -v "$PWD/dist:/dist:ro" "$FEDORA_IMAGE" sh -ec '
+          docker run --rm -v "$PWD/dist:/dist:ro" "$FEDORA_IMAGE" sh -exc '
             RPM=$(ls /dist/*.rpm)
-            rpm -qp --requires --recommends "$RPM"
+            rpm -qp --list "$RPM"
+            rpm -qp --requires "$RPM"
+            rpm -qp --recommends "$RPM"
             rpm -qp --scripts "$RPM" | grep -q "udevadm trigger"
-            # The container skips documentation by default: the check wants it, to see it removed too
             for i in 1 2 3; do
-              dnf install -y -q --setopt=tsflags= "$RPM" >/dev/null && break
+              dnf install -y -q "$RPM" >/dev/null && break
               echo "dnf failed (attempt $i), retrying"; sleep 10
             done
             rpm -q nogenuity
@@ -186,7 +188,6 @@ jobs:
             test -f /usr/share/icons/hicolor/scalable/apps/nogenuity.svg
             test -f /usr/share/alsa-card-profile/mixer/paths/nogenuity-alpha-s-game.conf
             test -f /usr/share/alsa-card-profile/mixer/profile-sets/nogenuity-alpha-s.conf
-            test -f /usr/share/doc/nogenuity/README.md
             command -v pactl
             RULE=/usr/lib/udev/rules.d/70-nogenuity.rules
             grep -q "TAG+=\"uaccess\"" "$RULE"
@@ -194,8 +195,7 @@ jobs:
             if ldd /usr/bin/nogenuity | grep "not found"; then echo "::error::Missing libraries"; exit 1; fi
             dnf remove -y -q nogenuity >/dev/null
             test ! -e /usr/bin/nogenuity
-            test ! -e "$RULE"
-            test ! -e /usr/share/doc/nogenuity'
+            test ! -e "$RULE"'
       - name: AppImage
         if: matrix.arch == 'x86_64'
         run: |

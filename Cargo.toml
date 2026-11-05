@@ -88,8 +88,7 @@ assets = [
     { source = "packaging/linux/alsa-card-profile/paths/nogenuity-alpha-s-chat.conf", dest = "/usr/share/alsa-card-profile/mixer/paths/nogenuity-alpha-s-chat.conf", mode = "644" },
     { source = "packaging/linux/alsa-card-profile/profile-sets/nogenuity-alpha-s.conf", dest = "/usr/share/alsa-card-profile/mixer/profile-sets/nogenuity-alpha-s.conf", mode = "644" },
     { source = "packaging/linux/icons/hicolor/*/apps/nogenuity.*", dest = "/usr/share/icons/hicolor/", mode = "644" },
-    { source = "README.md", dest = "/usr/share/doc/nogenuity/README.md", mode = "644", doc = true },
-    { source = "CONTRIBUTING.md", dest = "/usr/share/doc/nogenuity/CONTRIBUTING.md", mode = "644", doc = true },
+    # No files in /usr/share/doc/nogenuity: the package wouldn't own that folder, and removing it leaves it behind
 ]
 
 [package.metadata.generate-rpm.requires]
