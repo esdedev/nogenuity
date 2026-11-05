@@ -27,8 +27,10 @@ pub fn log_problem(problem: &str) {
     }
 }
 
-/// The outputs work again, so the same problem is worth logging if it comes back.
-pub fn problem_solved() {
+/// The outputs work again, so the same problem is worth logging if it comes back. Only for a status
+/// update to say: with a headset unplugged, one drag logged the same failed write ten times when
+/// any success in between counted.
+fn problem_solved() {
     LAST_PROBLEM.lock().unwrap().clear();
 }
 
@@ -85,7 +87,10 @@ pub fn refresh(audio: &mut Option<GameChat>, levels: &mut (f32, f32)) -> bool {
         return true;
     }
     match outputs.get() {
-        Some(now) => *levels = now,
+        Some(now) => {
+            *levels = now;
+            problem_solved();
+        }
         None => *audio = None,
     }
     false

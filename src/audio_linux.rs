@@ -9,7 +9,7 @@ use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::balance::{log_problem, problem_solved};
+use crate::balance::log_problem;
 
 /// `pactl` runs on the UI thread when reading, so it can't be left to hang.
 const PACTL_TIMEOUT: Duration = Duration::from_secs(3);
@@ -134,9 +134,7 @@ impl GameChat {
                         ok = false;
                     }
                 }
-                if ok {
-                    problem_solved();
-                } else {
+                if !ok {
                     worker_failed.store(true, Ordering::SeqCst);
                 }
                 worker_pending.fetch_sub(taken, Ordering::SeqCst);
@@ -151,9 +149,8 @@ impl GameChat {
         let (game, chat) = self.names.lock().unwrap().clone();
         let sinks = list_sinks().map_err(|e| log_problem(&e)).ok()?;
         let levels = levels_of(&sinks, &game, &chat);
-        match levels {
-            Some(_) => problem_solved(),
-            None => log_problem("balance: the outputs are gone or don't state a volume"),
+        if levels.is_none() {
+            log_problem("balance: the outputs are gone or don't state a volume");
         }
         levels
     }

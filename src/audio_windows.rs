@@ -11,7 +11,7 @@ use windows::Win32::System::Com::StructuredStorage::PropVariantToStringAlloc;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::balance::{log_problem, problem_solved};
+use crate::balance::log_problem;
 
 pub struct GameChat {
     game: IAudioEndpointVolume,
@@ -51,16 +51,7 @@ impl GameChat {
     /// what they are, so it mustn't be taken for a volume of zero.
     pub fn get(&self) -> Option<(f32, f32)> {
         let levels = unsafe { self.game.GetMasterVolumeLevelScalar().and_then(|game| Ok((game, self.chat.GetMasterVolumeLevelScalar()?))) };
-        match levels {
-            Ok(levels) => {
-                problem_solved();
-                Some(levels)
-            }
-            Err(e) => {
-                log_problem(&format!("balance: reading the volume: {e}"));
-                None
-            }
-        }
+        levels.map_err(|e| log_problem(&format!("balance: reading the volume: {e}"))).ok()
     }
 
     pub fn set(&self, game: f32, chat: f32) {
@@ -70,12 +61,9 @@ impl GameChat {
                 self.chat.SetMasterVolumeLevelScalar(chat.clamp(0.0, 1.0), std::ptr::null()),
             )
         };
-        match game.and(chat) {
-            Ok(()) => problem_solved(),
-            Err(e) => {
-                log_problem(&format!("balance: setting the volume: {e}"));
-                self.write_failed.store(true, Ordering::SeqCst);
-            }
+        if let Err(e) = game.and(chat) {
+            log_problem(&format!("balance: setting the volume: {e}"));
+            self.write_failed.store(true, Ordering::SeqCst);
         }
     }
 
