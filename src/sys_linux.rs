@@ -26,6 +26,10 @@ pub fn begin_scan() {
 /// udev rule embedded in the binary: can be installed from the standalone binary or an AppImage.
 const UDEV_RULE: &str = include_str!("../packaging/linux/70-nogenuity.rules");
 const UDEV_RULE_PATH: &str = "/etc/udev/rules.d/70-nogenuity.rules";
+/// The PipeWire profile that rule selects. PipeWire looks in /etc before its own folder.
+const AUDIO_PATH: &str = include_str!("../packaging/linux/alsa-card-profile/paths/nogenuity-alpha-s-game.conf");
+const AUDIO_PROFILE: &str = include_str!("../packaging/linux/alsa-card-profile/profile-sets/nogenuity-alpha-s.conf");
+const AUDIO_DIR: &str = "/etc/alsa-card-profile/mixer";
 
 pub enum GrantError {
     /// No pkexec (polkit) on the system.
@@ -36,16 +40,20 @@ pub enum GrantError {
     Failed,
 }
 
-/// Command run as root. Contains only fixed text (the rule goes in single quotes, which it
-/// doesn't contain) and fixed paths: nothing from the user or the environment. Arch and Fedora
+/// Command run as root. Contains only fixed text (the files go in single quotes, which they don't
+/// contain) and fixed paths: nothing from the user or the environment. Arch and Fedora
 /// lack the plugdev group: there it is removed from the rule (udev would ignore it with a warning; uaccess is enough).
 /// Any failure exits with 3, so it isn't confused with pkexec's 126/127 codes.
 fn grant_script() -> String {
     let rule = UDEV_RULE.replace('\r', "");
+    let (audio_path, audio_profile) = (AUDIO_PATH.replace('\r', ""), AUDIO_PROFILE.replace('\r', ""));
     format!(
         "{{ umask 022 && printf '%s' '{rule}' > {UDEV_RULE_PATH} && \
          if command -v getent > /dev/null && ! getent group plugdev > /dev/null; then \
          sed -i 's/, GROUP=\"plugdev\"//' {UDEV_RULE_PATH}; fi && \
+         mkdir -p {AUDIO_DIR}/paths {AUDIO_DIR}/profile-sets && \
+         printf '%s' '{audio_path}' > {AUDIO_DIR}/paths/nogenuity-alpha-s-game.conf && \
+         printf '%s' '{audio_profile}' > {AUDIO_DIR}/profile-sets/nogenuity-alpha-s.conf && \
          udevadm control --reload-rules && udevadm trigger --subsystem-match=hidraw --action=change; }} || exit 3"
     )
 }
@@ -423,13 +431,46 @@ mod tests {
 
     #[test]
     fn grant_script_is_fixed_text() {
-        assert!(!UDEV_RULE.contains('\''), "the rule cannot contain single quotes");
+        for file in [UDEV_RULE, AUDIO_PATH, AUDIO_PROFILE] {
+            assert!(!file.contains('\''), "these files cannot contain single quotes");
+        }
         let script = grant_script();
         assert!(script.contains("ATTRS{idVendor}==\"0951\""));
         assert!(script.contains("> /etc/udev/rules.d/70-nogenuity.rules &&"));
         assert!(!script.contains('$') && !script.contains('`'), "nothing the shell would expand");
         let syntax = std::process::Command::new("sh").args(["-n", "-c", &script]).status().unwrap();
         assert!(syntax.success(), "the root script has a syntax error");
+    }
+
+    #[test]
+    fn grant_script_writes_the_audio_profile() {
+        let root = std::env::temp_dir().join(format!("nogenuity-grant-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("etc/udev/rules.d")).unwrap();
+        let script = grant_script()
+            .replace("> /etc/", &format!("> {}/etc/", root.display()))
+            .replace("mkdir -p /etc/alsa-card-profile/mixer/paths /etc/", &format!("mkdir -p {0}/etc/alsa-card-profile/mixer/paths {0}/etc/", root.display()))
+            .replace("sed -i 's/, GROUP=\"plugdev\"//' /etc/", &format!("sed -i 's/, GROUP=\"plugdev\"//' {}/etc/", root.display()))
+            .replace("udevadm control --reload-rules && udevadm trigger --subsystem-match=hidraw --action=change", "true");
+        let status = std::process::Command::new("sh").args(["-c", &script]).status().unwrap();
+        assert!(status.success());
+        let read = |path: &str| std::fs::read_to_string(root.join(path)).unwrap();
+        assert_eq!(read("etc/alsa-card-profile/mixer/paths/nogenuity-alpha-s-game.conf"), AUDIO_PATH);
+        assert_eq!(read("etc/alsa-card-profile/mixer/profile-sets/nogenuity-alpha-s.conf"), AUDIO_PROFILE);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// What was tested on a real headset: the rule picks this profile, Game plays on device 0 with
+    /// the control of that device, and Chat on device 1.
+    #[test]
+    fn audio_profile_is_the_tested_one() {
+        assert!(UDEV_RULE.contains("ATTRS{idVendor}==\"0951\", ATTRS{idProduct}==\"16ed\", ENV{ACP_PROFILE_SET}=\"nogenuity-alpha-s.conf\""));
+        assert!(AUDIO_PATH.contains("[Element PCM]\n"));
+        assert!(!AUDIO_PATH.contains("PCM,1]"));
+        let mapping = |name: &str| AUDIO_PROFILE.split(&format!("[Mapping {name}]")).nth(1).unwrap().split("\n[").next().unwrap().to_string();
+        let game = mapping("stereo-game-output");
+        assert!(game.contains("hw:%f,0,0") && game.contains("paths-output = nogenuity-alpha-s-game"));
+        assert!(mapping("stereo-chat-output").contains("hw:%f,1,0"));
+        assert!(mapping("mono-chat-input").contains("hw:%f,0,0"));
     }
 
     #[test]

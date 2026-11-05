@@ -7,6 +7,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 DATA=${XDG_DATA_HOME:-$HOME/.local/share}
 BIN="$HOME/.local/bin"
 RULE=70-nogenuity.rules
+AUDIO=alsa-card-profile/mixer/profile-sets/nogenuity-alpha-s.conf
 
 if [ ! -f "$HERE/nogenuity" ]; then
     echo "nogenuity binary not found next to install.sh" >&2
@@ -56,17 +57,21 @@ fi
 
 echo "Nogenuity installed in $BIN/nogenuity and added to the application menu."
 
-# Access to the headset: udev rule (needs root once)
-if [ -f "/etc/udev/rules.d/$RULE" ] || [ -f "/usr/lib/udev/rules.d/$RULE" ] || [ -f "/lib/udev/rules.d/$RULE" ]; then
+# Access to the headset and its audio profile: a udev rule and two files (needs root once). A rule
+# from an earlier version has no profile, so it is installed again.
+if { [ -f "/etc/udev/rules.d/$RULE" ] || [ -f "/usr/lib/udev/rules.d/$RULE" ] || [ -f "/lib/udev/rules.d/$RULE" ]; } &&
+    { [ -f "/etc/$AUDIO" ] || [ -f "/usr/share/$AUDIO" ]; }; then
     exit 0
 fi
 manual() {
     echo "As root, run:"
     echo "  install -m 0644 \"$HERE/$RULE\" /etc/udev/rules.d/$RULE"
+    echo "  mkdir -p /etc/alsa-card-profile && cp -R \"$HERE/alsa-card-profile\" /etc/alsa-card-profile/mixer"
     echo "  udevadm control --reload-rules && udevadm trigger --subsystem-match=hidraw --action=change"
 }
 echo
-echo "Nogenuity also needs a udev rule to talk to the headset without root."
+echo "Nogenuity also needs a udev rule to talk to the headset without root, and a Cloud Alpha S needs"
+echo "an audio profile for its Game and Chat outputs (plug it back in afterwards to apply it)."
 answer=n
 if [ -t 0 ]; then
     printf "Install it now? It asks for your password once. [y/N] "

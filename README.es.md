@@ -60,7 +60,7 @@ tienen un enlace **Enviar informe** que hace casi todo. **Vienen más modelos**:
 | Sistema | Estado |
 |---|---|
 | Windows 10 / 11, x64 | Probado en Windows 11 |
-| Linux, x86-64 (X11 o Wayland), glibc 2.31+ (Ubuntu 20.04, Debian 11 y posteriores) | Probado con los cascos de verdad en Ubuntu 24.04 (WSL2 + usbipd). El balance juego/chat aún no se ha probado en un Linux de escritorio |
+| Linux, x86-64 (X11 o Wayland), glibc 2.31+ (Ubuntu 20.04, Debian 11 y posteriores) | Probado con los cascos de verdad en Ubuntu 26.04 (PipeWire) y Ubuntu 24.04 (WSL2 + usbipd, sin balance) |
 
 ## Instalación en Windows
 
@@ -91,13 +91,37 @@ Si antes instalaste el tarball con `install.sh`, ejecuta primero su `uninstall.s
 Sin el instalador: ejecuta `./nogenuity` desde la carpeta e instala la regla udev a mano:
 ```
 sudo install -m 0644 70-nogenuity.rules /etc/udev/rules.d/
+sudo mkdir -p /etc/alsa-card-profile && sudo cp -R alsa-card-profile /etc/alsa-card-profile/mixer
 sudo udevadm control --reload-rules && sudo udevadm trigger --subsystem-match=hidraw --action=change
 ```
 Si falta la regla, la app lo avisa en su barra de estado.
 
 El icono de la bandeja usa StatusNotifierItem: funciona directamente en KDE Plasma y la mayoría de
 escritorios; en GNOME necesita la extensión *AppIndicator*. Sin bandeja, volver a abrir la app muestra la
-ventana. El balance usa `pactl` (PipeWire o PulseAudio).
+ventana. El balance usa `pactl` (PipeWire o PulseAudio), del paquete `pulseaudio-utils` en Debian y Ubuntu.
+
+## Balance juego/chat en Linux
+
+El balance necesita dos salidas, Game y Chat. Con PipeWire, un Cloud Alpha S solo tiene una por defecto, así que el
+`.deb`, `install.sh` y el botón **Grant access** instalan también un perfil de PipeWire para estos cascos. Se aplica
+la próxima vez que los conectes. Esto cambia cómo configura el sistema su audio: en los ajustes de sonido aparecen
+entonces dos salidas, ambas llamadas "Headphones".
+
+Para comprobarlo, `pactl list sinks short` debe mostrar `stereo-game-output` y `stereo-chat-output`.
+
+- **Probado en:** Ubuntu 26.04 con PipeWire 1.6.2 y un Cloud Alpha S real: balance, desconexión, micrófono, 7.1 y EQ.
+  No se ha probado en otras distribuciones ni en versiones anteriores de PipeWire, y PulseAudio sin PipeWire no
+  lee este perfil.
+- **Si diste permiso con una versión anterior:** ejecuta de nuevo `./install.sh` o instala el `.deb`.
+- **Para quitarlo** (el `.deb` quita sus propios archivos con `sudo apt remove nogenuity`):
+  ```
+  sudo rm /etc/udev/rules.d/70-nogenuity.rules
+  sudo rm /etc/alsa-card-profile/mixer/paths/nogenuity-alpha-s-game.conf
+  sudo rm /etc/alsa-card-profile/mixer/profile-sets/nogenuity-alpha-s.conf
+  sudo udevadm control --reload-rules
+  ```
+  Después vuelve a conectar los cascos. La primera línea también quita el acceso a los cascos: sin ella, la app
+  vuelve a mostrar el botón **Grant access**.
 
 ## Compilar
 
