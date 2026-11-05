@@ -45,7 +45,7 @@ body:
     id: version
     attributes:
       label: Nogenuity version
-      placeholder: "0.1.1"
+      placeholder: "0.1.2"
   - type: checkboxes
     id: works
     attributes:
