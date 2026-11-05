@@ -177,7 +177,7 @@ fn stinger_battery(volts: f32, charge: Charge) -> u8 {
     }
 }
 
-/// What is shown of the battery, filtered: when charging stops the reading bounces for a few
+/// What is shown of the battery, filtered: when charging stops the reading may bounce for a few
 /// seconds, so that change is only accepted after four equal readings in a row (starting to
 /// charge, immediately). Meanwhile the previous value is kept, battery included.
 #[derive(Clone, Copy, Debug, Default)]
@@ -328,6 +328,8 @@ mod tests {
         0xFF, 0x12, 0x05, 0xFE, 0x0C, 0x04, 0x1F, 0x0B, 0x01, 0x05, 0x03, 0x7E, 0x0F, 0xE0, 0x02, 0x03, 0x68, 0x10,
         0x00, 0x00,
     ];
+    const FRESH_BATTERY_FULL: [u8; 15] =
+        [0xFF, 0x12, 0x05, 0xFE, 0x0C, 0x04, 0x1F, 0x0B, 0x01, 0x06, 0x05, 0xCF, 0x0F, 0x00, 0x00];
     const READ_BATTERY: [u8; 13] =
         [0xFF, 0x01, 0x00, 0xFE, 0x0C, 0x04, 0x1F, 0x0B, 0x01, 0x03, 0x05, 0xCC, 0x0E];
 
@@ -336,6 +338,7 @@ mod tests {
         assert!(stinger_is_fresh(&FRESH_CONNECTIVITY, &STINGER_CONNECTIVITY));
         assert!(stinger_is_fresh(&FRESH_BATTERY, &STINGER_BATTERY));
         assert!(stinger_is_fresh(&FRESH_BATTERY_CHARGING, &STINGER_BATTERY));
+        assert!(stinger_is_fresh(&FRESH_BATTERY_FULL, &STINGER_BATTERY));
     }
 
     #[test]
@@ -365,6 +368,9 @@ mod tests {
         assert_eq!((charge, mv), (Charge::No, 3787));
         let (charge, mv) = stinger_reading(&FRESH_BATTERY_CHARGING).unwrap();
         assert_eq!((charge, mv), (Charge::Charging, 3966));
+        let (charge, mv) = stinger_reading(&FRESH_BATTERY_FULL).unwrap();
+        assert_eq!((charge, mv), (Charge::Full, 4047));
+        assert_eq!(stinger_battery(mv as f32 / 1000.0, charge), 100);
         // The stale reply a fixed wait got has an unknown state in byte 9
         assert_eq!(stinger_reading(&READ_CONNECTIVITY), None);
         assert_eq!(stinger_reading(&FRESH_BATTERY[..12]), None);

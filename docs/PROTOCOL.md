@@ -274,7 +274,7 @@ app sets it again on connect.
 They only report battery, charging and whether the headset is on (the USB dongle stays plugged in); neither
 has controls Nogenuity can show. **Not verified with Nogenuity on hardware.** The Cloud Flight Wireless notes
 are unconfirmed; the Cloud Stinger Core Wireless ones were checked on Linux by a tester with their own tool,
-except the full state (`06`) and the percentage curve.
+except the percentage curve.
 
 **Cloud Flight Wireless** (`0951:16C4`, `0951:1723`, `03F0:0E90`, interface 3, `Col03`):
 
@@ -297,13 +297,18 @@ except the full state (`06`) and the percentage curve.
   been read comes back with bytes 1-2 = `01 00`.
 - Headset on: request `FF 07 00 FD 04 00 00 02 82 03 05 29 0F 00 00 03 68 10 00 00`, reply byte 11 = 1 (`03`
   when the headset is off and the dongle is plugged in). With the headset off, the battery request gets no
-  fresh reply, so Nogenuity doesn't send it then.
+  fresh reply, so Nogenuity doesn't send it then. Byte 11 is the only data in this reply: bytes 9-10 are
+  leftovers of earlier replies and change at random, and bytes 12 onwards are leftovers of the previous
+  request.
 - Battery: request `FF 07 00 FD 04 0C F1 02 01 04 F0 0C` (byte 6 `F1` = dongle). Reply byte 9 = charge
   state (`03` not charging, `05` charging, `06` full; other values are ignored), bytes 11-12 = voltage in
-  mV, little-endian. Bytes 13-14 were `00 00` when not charging and `E0 02` while charging; their meaning is
-  unknown.
-- The reading bounces for a few seconds when the cable is pulled, so leaving a charging state is only
-  taken after four equal readings in a row, keeping the previous battery meanwhile.
+  mV, little-endian. Bytes 13-14 were `E0 02` (736) while charging and `00 00` when not charging or full,
+  most likely the charging current in mA. Byte 10 was `03` while charging and `05` otherwise; its meaning is
+  unknown. Bytes 15 onwards are leftovers of the previous request. Nogenuity reads only the state and the
+  voltage.
+- The reading may bounce for a few seconds when the cable is pulled, so leaving a charging state is only
+  taken after four equal readings in a row, keeping the previous battery meanwhile. A tester saw `06` go
+  straight to `03` once, with no bounce, polling every 250 ms; `05` to `03` hasn't been reported.
 - On Linux, hidraw doesn't give the feature size: Nogenuity reads it from the HID report descriptor (the
   size of report `FF`).
 - On Windows both models are opened on `Col03` (`collection` in the model).
