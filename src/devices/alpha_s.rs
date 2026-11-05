@@ -46,6 +46,11 @@ const REPORT_ID: u8 = 0x06;
 const BUTTON_REPORT: u8 = 0x0A;
 const MOD_CTRL: [u8; 3] = [0x68, 0x4A, 0x8E];
 const MOD_EQ: [u8; 3] = [0x30, 0x2B, 0xAE];
+/// Byte 2 of most commands, and of 7.1.
+const KIND_COMMAND: u8 = 0x01;
+const KIND_SURROUND: u8 = 0x0D;
+/// Byte 4 of the commands on `MOD_CTRL`, which the ACK echoes.
+const COMMAND_CONTROL: u8 = 0x9B;
 const PARAM_STATUS: u8 = 0x09;
 const PARAM_SURROUND: u8 = 0x02;
 const PARAM_SIDETONE: u8 = 0x07;
@@ -64,13 +69,24 @@ const EQ_FREQUENCY: Range<usize> = 18..22;
 const EQ_Q: Range<usize> = 22..26;
 const EQ_GAIN: Range<usize> = 26..30;
 
-/// Writes one band's values into its packet.
-fn write_eq_band(p: &mut [u8], index: usize, (hz, gain, q, filter): Band) {
+/// Writes the bytes every command starts with.
+fn with_header(mut p: Vec<u8>, kind: u8, b4: u8, module: [u8; 3], b6: u8) -> Vec<u8> {
+    p[2] = kind;
+    p[4] = b4;
+    p[6] = b6;
+    p[7..10].copy_from_slice(&module);
+    p
+}
+
+/// The packet that sets one band on one channel, from an empty `report`.
+fn eq_packet(report: Vec<u8>, channel: u8, index: usize, (hz, gain, q, filter): Band) -> Vec<u8> {
+    let mut p = with_header(report, EQ_KIND, EQ_COMMAND, MOD_EQ, EQ_FIRST_CHANNEL + channel);
     p[EQ_BAND_INDEX].copy_from_slice(&(index as i32).to_le_bytes());
     p[EQ_FILTER].copy_from_slice(&(filter as i32).to_le_bytes());
     p[EQ_FREQUENCY].copy_from_slice(&(hz.round() as i32).to_le_bytes());
     p[EQ_Q].copy_from_slice(&q8_23(q));
     p[EQ_GAIN].copy_from_slice(&q8_23(gain));
+    p
 }
 
 struct AlphaS {
@@ -86,12 +102,7 @@ fn dsp_ready_at() -> &'static Mutex<Option<Instant>> {
 
 impl AlphaS {
     fn packet(&self, kind: u8, b4: u8, module: [u8; 3], b6: u8) -> Vec<u8> {
-        let mut p = self.link.report(REPORT_ID);
-        p[2] = kind;
-        p[4] = b4;
-        p[6] = b6;
-        p[7..10].copy_from_slice(&module);
-        p
+        with_header(self.link.report(REPORT_ID), kind, b4, module, b6)
     }
 
     /// Waits for the command ACK: same bytes 4 and 6, with bit 7 of byte 5 set.
@@ -100,12 +111,12 @@ impl AlphaS {
     }
 
     fn control(&self, kind: u8, param: u8) -> Res<Option<Vec<u8>>> {
-        let mut p = self.packet(kind, 0x9B, MOD_CTRL, 0);
+        let mut p = self.packet(kind, COMMAND_CONTROL, MOD_CTRL, 0);
         p[10] = param;
         let _lock = self.link.lock()?;
         self.link.send(&p, REPORT_ID)?;
         std::thread::sleep(Duration::from_millis(20));
-        Ok(self.read_ack(0x9B, 0))
+        Ok(self.read_ack(COMMAND_CONTROL, 0))
     }
 }
 
@@ -119,7 +130,7 @@ impl Headset for AlphaS {
     }
 
     fn status(&self) -> Res<Status> {
-        let r = self.control(0x01, PARAM_STATUS)?.ok_or(HidError(t().no_status))?;
+        let r = self.control(KIND_COMMAND, PARAM_STATUS)?.ok_or(HidError(t().no_status))?;
         if r.len() < 22 {
             return Err(HidError(t().short_status));
         }
@@ -142,7 +153,7 @@ impl Headset for AlphaS {
         if self.status()?.surround == on {
             return Ok(false);
         }
-        self.control(0x0D, PARAM_SURROUND)?;
+        self.control(KIND_SURROUND, PARAM_SURROUND)?;
         *dsp_ready_at().lock().unwrap() = Some(Instant::now() + DSP_SETTLE);
         Ok(true)
     }
@@ -151,7 +162,7 @@ impl Headset for AlphaS {
         if self.status()?.sidetone == on {
             return Ok(false);
         }
-        self.control(0x01, PARAM_SIDETONE)?;
+        self.control(KIND_COMMAND, PARAM_SIDETONE)?;
         Ok(true)
     }
 
@@ -167,12 +178,10 @@ impl Headset for AlphaS {
         }
         let mut ok = true;
         for channel in 0..EQ_CHANNELS {
-            let target = EQ_FIRST_CHANNEL + channel;
-            let mut p = self.packet(EQ_KIND, EQ_COMMAND, MOD_EQ, target);
-            write_eq_band(&mut p, index, band);
+            let p = eq_packet(self.link.report(REPORT_ID), channel, index, band);
             let _lock = self.link.lock()?;
             self.link.send(&p, REPORT_ID)?;
-            ok &= self.read_ack(EQ_COMMAND, target).is_some();
+            ok &= self.read_ack(EQ_COMMAND, EQ_FIRST_CHANNEL + channel).is_some();
         }
         Ok(ok)
     }
@@ -191,14 +200,22 @@ impl Headset for AlphaS {
 mod tests {
     use super::*;
 
+    fn empty_report() -> Vec<u8> {
+        let mut report = vec![0u8; 62];
+        report[0] = REPORT_ID;
+        report
+    }
+
     /// Against the table in docs/PROTOCOL.md: 1 kHz low shelf at Q 1, -3 dB, as band 3.
     #[test]
     fn eq_band_bytes() {
-        let mut p = vec![0u8; 62];
-        write_eq_band(&mut p, 3, (1000.0, -3.0, 1.0, 1));
+        let p = eq_packet(empty_report(), 1, 3, (1000.0, -3.0, 1.0, 1));
         assert_eq!(
-            p[10..30],
+            p[..30],
             [
+                0x06, 0x00, 0x0D, 0x00, 0x41, 0x00, // report ID, kind, command
+                0x05, // first channel + 1
+                0x30, 0x2B, 0xAE, // module
                 0x03, 0x00, 0x00, 0x00, // band index
                 0x01, 0x00, 0x00, 0x00, // filter
                 0xE8, 0x03, 0x00, 0x00, // frequency
@@ -207,5 +224,19 @@ mod tests {
             ]
         );
         assert!(p[30..].iter().all(|&b| b == 0));
+    }
+
+    #[test]
+    fn eq_channels_are_bytes_4_and_5() {
+        for (channel, byte) in [(0, 0x04), (1, 0x05)] {
+            assert_eq!(eq_packet(empty_report(), channel, 0, (1000.0, 0.0, 1.0, 0))[6], byte);
+        }
+    }
+
+    /// As documented: the fraction of a Q8.23 value is dropped, not rounded.
+    #[test]
+    fn eq_gain_drops_the_fraction() {
+        let p = eq_packet(empty_report(), 0, 0, (1000.0, 0.1, 1.0, 0));
+        assert_eq!(p[EQ_GAIN], [0xCC, 0xCC, 0x0C, 0x00]);
     }
 }
