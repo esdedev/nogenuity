@@ -9,9 +9,14 @@ use windows::Win32::Media::Audio::{eRender, IMMDeviceEnumerator, MMDeviceEnumera
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL, STGM_READ};
 use windows::Win32::System::Com::StructuredStorage::PropVariantToStringAlloc;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use crate::balance::{log_problem, problem_solved};
+
 pub struct GameChat {
     game: IAudioEndpointVolume,
     chat: IAudioEndpointVolume,
+    write_failed: AtomicBool,
 }
 
 impl GameChat {
@@ -38,20 +43,49 @@ impl GameChat {
                     chat = volume;
                 }
             }
-            Some(GameChat { game: game?, chat: chat? })
+            Some(GameChat { game: game?, chat: chat?, write_failed: AtomicBool::new(false) })
         }
     }
 
     /// The current volumes, or `None` if they can't be read. Not reading them says nothing about
     /// what they are, so it mustn't be taken for a volume of zero.
     pub fn get(&self) -> Option<(f32, f32)> {
-        unsafe { Some((self.game.GetMasterVolumeLevelScalar().ok()?, self.chat.GetMasterVolumeLevelScalar().ok()?)) }
+        let levels = unsafe { self.game.GetMasterVolumeLevelScalar().and_then(|game| Ok((game, self.chat.GetMasterVolumeLevelScalar()?))) };
+        match levels {
+            Ok(levels) => {
+                problem_solved();
+                Some(levels)
+            }
+            Err(e) => {
+                log_problem(&format!("balance: reading the volume: {e}"));
+                None
+            }
+        }
     }
 
     pub fn set(&self, game: f32, chat: f32) {
-        unsafe {
-            let _ = self.game.SetMasterVolumeLevelScalar(game.clamp(0.0, 1.0), std::ptr::null());
-            let _ = self.chat.SetMasterVolumeLevelScalar(chat.clamp(0.0, 1.0), std::ptr::null());
+        let (game, chat) = unsafe {
+            (
+                self.game.SetMasterVolumeLevelScalar(game.clamp(0.0, 1.0), std::ptr::null()),
+                self.chat.SetMasterVolumeLevelScalar(chat.clamp(0.0, 1.0), std::ptr::null()),
+            )
+        };
+        match game.and(chat) {
+            Ok(()) => problem_solved(),
+            Err(e) => {
+                log_problem(&format!("balance: setting the volume: {e}"));
+                self.write_failed.store(true, Ordering::SeqCst);
+            }
         }
+    }
+
+    /// Always: a write here has reached the output by the time it returns.
+    pub fn settled(&self) -> bool {
+        true
+    }
+
+    /// Whether a write failed since the last time this was asked.
+    pub fn take_write_failure(&self) -> bool {
+        self.write_failed.swap(false, Ordering::SeqCst)
     }
 }

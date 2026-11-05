@@ -773,8 +773,9 @@ impl App {
                     if self.audio.is_none() {
                         self.audio = self.model.and_then(|m| m.caps.game_chat_outputs).and_then(GameChat::find);
                     }
-                    if let Some(levels) = self.audio.as_ref().and_then(GameChat::get) {
-                        self.win_levels = levels;
+                    if crate::balance::refresh(&mut self.audio, &mut self.win_levels) {
+                        crate::balance::recenter(&mut self.settings);
+                        self.schedule_save();
                     }
                 }
                 Event::Button(b) => {
@@ -796,22 +797,18 @@ impl App {
     }
 
     fn set_balance(&mut self, value: i32) {
-        let value = if value.abs() < 6 { 0 } else { value.clamp(-100, 100) };
         let Some(audio) = &self.audio else { return };
-        if self.settings.balance_base.is_none() || (self.settings.balance == 0 && value != 0) {
-            // Without the current volumes there's nothing to work the new ones out from
-            let Some(base) = audio.get() else {
-                self.log = t().no_outputs.into();
-                self.refresh();
-                return;
-            };
-            self.settings.balance_base = Some(base);
-        }
-        let (bg, bc) = self.settings.balance_base.unwrap();
-        let levels = (bg * (1.0 - value.max(0) as f32 / 100.0), bc * (1.0 - (-value).max(0) as f32 / 100.0));
-        audio.set(levels.0, levels.1);
-        self.settings.balance = value;
-        self.win_levels = levels;
+        let Some(step) = crate::balance::step(value, self.settings.balance, self.settings.balance_base, audio.settled(), || audio.get()) else {
+            // Dropped, so a drag doesn't keep trying: the next status update looks for them again
+            self.audio = None;
+            self.log = t().no_outputs.into();
+            self.refresh();
+            return;
+        };
+        audio.set(step.levels.0, step.levels.1);
+        self.settings.balance = step.value;
+        self.settings.balance_base = Some(step.base);
+        self.win_levels = step.levels;
         self.schedule_save();
         self.refresh();
     }
@@ -1326,8 +1323,9 @@ pub fn run(start_hidden: bool) {
     let (backend, events) = Backend::start(notify, on_connect);
     let model = settings.model.as_deref().and_then(devices::find);
     let layout = model.map_or_else(Layout::before_connect, |m| Layout::for_caps(&m.caps));
-    let audio = model.and_then(|m| m.caps.game_chat_outputs).and_then(GameChat::find);
-    let win_levels = audio.as_ref().and_then(GameChat::get).unwrap_or((0.0, 0.0));
+    let mut audio = model.and_then(|m| m.caps.game_chat_outputs).and_then(GameChat::find);
+    let mut win_levels = (0.0, 0.0);
+    crate::balance::refresh(&mut audio, &mut win_levels);
     let n = 220;
     let freqs = (0..n).map(|i| F_MIN * (F_MAX / F_MIN).powf(i as f32 / (n - 1) as f32)).collect();
 

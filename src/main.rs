@@ -4,6 +4,7 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod backend;
+mod balance;
 mod devices;
 mod eq;
 mod hid;

@@ -2,11 +2,17 @@
 //! PulseAudio). Changes are applied on a separate thread, keeping only the latest, so that
 //! dragging the slider doesn't spawn a process per movement.
 
-use std::process::Command;
-use std::sync::mpsc::{channel, Sender};
+use std::io;
+use std::process::{Command, Output, Stdio};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
-use crate::hid::log;
+use crate::balance::{log_problem, problem_solved};
+
+/// `pactl` runs on the UI thread when reading, so it can't be left to hang.
+const PACTL_TIMEOUT: Duration = Duration::from_secs(3);
 
 struct Sink {
     name: String,
@@ -15,22 +21,25 @@ struct Sink {
     volume: Option<f32>,
 }
 
-/// Writes a problem to the log, unless it's the one written last: the callers retry on every
-/// status update. Keep sink names out of it, since they can hold a serial number and the log goes
-/// into device reports.
-fn log_problem(problem: &str) {
-    static LAST: Mutex<String> = Mutex::new(String::new());
-    let mut last = LAST.lock().unwrap();
-    if *last != problem {
-        log(problem);
-        *last = problem.to_string();
-    }
+/// The output of `command`, which gets killed if it takes longer than `limit`.
+fn output_within(command: &mut Command, limit: Duration) -> io::Result<Output> {
+    let child = command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?;
+    let pid = child.id() as libc::pid_t;
+    let (finished, wait) = channel::<()>();
+    std::thread::spawn(move || {
+        if matches!(wait.recv_timeout(limit), Err(RecvTimeoutError::Timeout)) {
+            unsafe { libc::kill(pid, libc::SIGKILL) };
+        }
+    });
+    let output = child.wait_with_output();
+    drop(finished);
+    output
 }
 
 /// Runs `pactl` with LC_ALL=C (untranslated labels) and returns its output, or what went wrong.
 fn pactl(args: &[&str]) -> Result<String, String> {
     let command = args[0];
-    let out = Command::new("pactl").env("LC_ALL", "C").args(args).output().map_err(|e| format!("pactl {command}: {e}"))?;
+    let out = output_within(Command::new("pactl").env("LC_ALL", "C").args(args), PACTL_TIMEOUT).map_err(|e| format!("pactl {command}: {e}"))?;
     if !out.status.success() {
         let stderr = String::from_utf8_lossy(&out.stderr);
         return Err(format!("pactl {command}: {} ({})", stderr.lines().next().unwrap_or("").trim(), out.status));
@@ -69,9 +78,18 @@ fn levels_of(sinks: &[Sink], game: &str, chat: &str) -> Option<(f32, f32)> {
     Some((volume(game)?, volume(chat)?))
 }
 
+/// A volume as `pactl` takes it. Not limited to 100 %: the balance only ever lowers an output from
+/// where it was, and it may have been above that.
+fn percent(level: f32) -> String {
+    format!("{}%", (level.max(0.0) * 100.0).round() as u32)
+}
+
 pub struct GameChat {
     names: Arc<Mutex<(String, String)>>,
     tx: Sender<(f32, f32)>,
+    /// Writes sent to the thread that it hasn't finished yet.
+    pending: Arc<AtomicUsize>,
+    write_failed: Arc<AtomicBool>,
 }
 
 impl GameChat {
@@ -98,21 +116,33 @@ impl GameChat {
         let names = Arc::new(Mutex::new((ours[game].name.clone(), ours[chat].name.clone())));
         let (tx, rx) = channel::<(f32, f32)>();
         let worker_names = names.clone();
+        let pending = Arc::new(AtomicUsize::new(0));
+        let write_failed = Arc::new(AtomicBool::new(false));
+        let (worker_pending, worker_failed) = (pending.clone(), write_failed.clone());
         std::thread::spawn(move || {
             while let Ok(mut v) = rx.recv() {
+                let mut taken = 1;
                 while let Ok(next) = rx.try_recv() {
                     v = next;
+                    taken += 1;
                 }
                 let (game, chat) = worker_names.lock().unwrap().clone();
+                let mut ok = true;
                 for (sink, level) in [(game, v.0), (chat, v.1)] {
-                    let pct = format!("{}%", (level.clamp(0.0, 1.0) * 100.0).round() as u32);
-                    if let Err(e) = pactl(&["set-sink-volume", &sink, &pct]) {
+                    if let Err(e) = pactl(&["set-sink-volume", &sink, &percent(level)]) {
                         log_problem(&e);
+                        ok = false;
                     }
                 }
+                if ok {
+                    problem_solved();
+                } else {
+                    worker_failed.store(true, Ordering::SeqCst);
+                }
+                worker_pending.fetch_sub(taken, Ordering::SeqCst);
             }
         });
-        Some(GameChat { names, tx })
+        Some(GameChat { names, tx, pending, write_failed })
     }
 
     /// The current volumes, or `None` if they can't be read. Not reading them says nothing about
@@ -121,14 +151,26 @@ impl GameChat {
         let (game, chat) = self.names.lock().unwrap().clone();
         let sinks = list_sinks().map_err(|e| log_problem(&e)).ok()?;
         let levels = levels_of(&sinks, &game, &chat);
-        if levels.is_none() {
-            log_problem("balance: the outputs are gone or don't state a volume");
+        match levels {
+            Some(_) => problem_solved(),
+            None => log_problem("balance: the outputs are gone or don't state a volume"),
         }
         levels
     }
 
     pub fn set(&self, game: f32, chat: f32) {
+        self.pending.fetch_add(1, Ordering::SeqCst);
         let _ = self.tx.send((game, chat));
+    }
+
+    /// Whether every write has reached the outputs, so that reading them gives what they'll stay at.
+    pub fn settled(&self) -> bool {
+        self.pending.load(Ordering::SeqCst) == 0
+    }
+
+    /// Whether a write failed since the last time this was asked.
+    pub fn take_write_failure(&self) -> bool {
+        self.write_failed.swap(false, Ordering::SeqCst)
     }
 }
 
@@ -163,6 +205,28 @@ Sink #2
 	Volume: mono: 65536 / 100% / 0.00 dB
 	Base Volume: 65536 / 100% / 0.00 dB
 ";
+
+    #[test]
+    fn a_command_that_hangs_is_killed() {
+        let start = std::time::Instant::now();
+        let out = output_within(Command::new("sleep").arg("30"), Duration::from_millis(100)).unwrap();
+        assert!(!out.status.success());
+        assert!(start.elapsed() < Duration::from_secs(10));
+    }
+
+    #[test]
+    fn a_quick_command_gives_its_output() {
+        let out = output_within(Command::new("sh").args(["-c", "echo hi"]), Duration::from_secs(30)).unwrap();
+        assert!(out.status.success());
+        assert_eq!(out.stdout, b"hi\n");
+    }
+
+    #[test]
+    fn volumes_can_stay_above_100() {
+        assert_eq!(percent(1.5), "150%");
+        assert_eq!(percent(0.65), "65%");
+        assert_eq!(percent(-0.1), "0%");
+    }
 
     #[test]
     fn reads_each_sink() {
