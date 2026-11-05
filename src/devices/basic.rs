@@ -2,7 +2,8 @@
 //! plugged in even when it is not). Cloud Flight Wireless (output report, reply on the interrupt
 //! endpoint) and Cloud Stinger Core Wireless (feature reports). Details in docs/PROTOCOL.md.
 //!
-//! EXPERIMENTAL: not tested on hardware.
+//! EXPERIMENTAL: the Cloud Flight Wireless hasn't been tested on hardware. One tester confirmed the
+//! Stinger on Linux with this app (issue #6); Windows and the percentage curve are still unchecked.
 
 use std::cell::Cell;
 use std::time::Duration;
@@ -132,8 +133,10 @@ const STINGER_CONNECTIVITY: [u8; 20] =
 /// Battery (byte 6 = 0xF1 is the receiver variant, the only ID there is). Reply: byte 9 =
 /// charge state, bytes 11-12 = voltage in mV (little-endian).
 const STINGER_BATTERY: [u8; 12] = [0xFF, 0x07, 0x00, 0xFD, 0x04, 0x0C, 0xF1, 0x02, 0x01, 0x04, 0xF0, 0x0C];
-/// Wait between SET_FEATURE and GET_FEATURE.
-const STINGER_WAIT: Duration = Duration::from_millis(20);
+/// How often GET_FEATURE is retried after SET_FEATURE, and for how long. The battery reply took
+/// 23-39 ms on a tester's unit, the connectivity one 5-7 ms.
+const STINGER_POLL: Duration = Duration::from_millis(5);
+const STINGER_TIMEOUT: Duration = Duration::from_millis(1000);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Charge {
@@ -152,6 +155,19 @@ fn stinger_charge(b: u8) -> Option<Charge> {
     }
 }
 
+/// Whether `reply` answers `request` and hasn't been read yet: byte 3 = 0xFE, byte 2 != 0 and bytes
+/// 4-5 = request bytes 5 and 4. The dongle keeps returning a reply it already gave, with bytes 1-2
+/// = 01 00, until the next one is ready.
+fn stinger_is_fresh(reply: &[u8], request: &[u8]) -> bool {
+    reply.len() > 5 && reply[3] == 0xFE && reply[2] != 0 && reply[4] == request[5] && reply[5] == request[4]
+}
+
+/// Charge state and voltage (mV) of a battery reply. None if it's short or the state is unknown.
+fn stinger_reading(reply: &[u8]) -> Option<(Charge, i16)> {
+    let (state, lo, hi) = (*reply.get(9)?, *reply.get(11)?, *reply.get(12)?);
+    Some((stinger_charge(state)?, i16::from_le_bytes([lo, hi])))
+}
+
 /// Battery % from the voltage; when full, 100.
 fn stinger_battery(volts: f32, charge: Charge) -> u8 {
     match charge {
@@ -161,7 +177,7 @@ fn stinger_battery(volts: f32, charge: Charge) -> u8 {
     }
 }
 
-/// What is shown of the battery, filtered: when charging stops the reading bounces for a few
+/// What is shown of the battery, filtered: when charging stops the reading may bounce for a few
 /// seconds, so that change is only accepted after four equal readings in a row (starting to
 /// charge, immediately). Meanwhile the previous value is kept, battery included.
 #[derive(Clone, Copy, Debug, Default)]
@@ -198,15 +214,14 @@ struct Stinger {
 }
 
 impl Stinger {
-    /// SET_FEATURE with the request, 20 ms and GET_FEATURE 0xFF.
+    /// SET_FEATURE with the request, then GET_FEATURE 0xFF until the fresh reply arrives.
     fn ask(&self, request: &[u8]) -> Res<Option<Vec<u8>>> {
         let mut p = self.link.feature(STINGER_ID);
         let n = request.len().min(p.len());
         p[..n].copy_from_slice(&request[..n]);
         let _lock = self.link.lock()?;
         self.link.set_feature(&p)?;
-        std::thread::sleep(STINGER_WAIT);
-        Ok(self.link.get_feature(STINGER_ID))
+        Ok(self.link.poll_feature(STINGER_ID, STINGER_POLL, STINGER_TIMEOUT, |r| stinger_is_fresh(r, request)))
     }
 }
 
@@ -227,14 +242,11 @@ impl Headset for Stinger {
             self.shown.set(ChargeFilter::default());
             return Ok(Status { asleep: true, ..Status::default() });
         }
-        let reply = self.ask(&STINGER_BATTERY)?.filter(|r| r.len() >= 13);
+        let reading = self.ask(&STINGER_BATTERY)?.as_deref().and_then(stinger_reading);
         let mut filter = self.shown.get();
-        // An unknown charge state changes nothing
-        let shown = match reply.as_deref().and_then(|r| Some((r, stinger_charge(r[9])?))) {
-            Some((r, charge)) => {
-                let volts = i16::from_le_bytes([r[11], r[12]]) as f32 / 1000.0;
-                Some(filter.update(charge, stinger_battery(volts, charge)))
-            }
+        // No reply or an unknown charge state changes nothing
+        let shown = match reading {
+            Some((charge, mv)) => Some(filter.update(charge, stinger_battery(mv as f32 / 1000.0, charge))),
             None => filter.shown,
         };
         self.shown.set(filter);
@@ -301,5 +313,66 @@ mod tests {
         f.update(Charge::Charging, 99);
         f.update(Charge::No, 90);
         assert_eq!(f.update(Charge::No, 90), (Charge::Full, 100));
+    }
+
+    // Replies captured on a Cloud Stinger Core Wireless (issue #6)
+    const FRESH_CONNECTIVITY: [u8; 13] =
+        [0xFF, 0x0C, 0x05, 0xFE, 0x00, 0x04, 0x0F, 0x05, 0x82, 0x00, 0xFB, 0x01, 0x0E];
+    const READ_CONNECTIVITY: [u8; 13] =
+        [0xFF, 0x01, 0x00, 0xFE, 0x00, 0x04, 0x0F, 0x05, 0x82, 0x00, 0xFB, 0x01, 0x0E];
+    const FRESH_BATTERY: [u8; 20] = [
+        0xFF, 0x12, 0x05, 0xFE, 0x0C, 0x04, 0x1F, 0x0B, 0x01, 0x03, 0x05, 0xCB, 0x0E, 0x00, 0x00, 0x03, 0x68, 0x10,
+        0x00, 0x00,
+    ];
+    const FRESH_BATTERY_CHARGING: [u8; 20] = [
+        0xFF, 0x12, 0x05, 0xFE, 0x0C, 0x04, 0x1F, 0x0B, 0x01, 0x05, 0x03, 0x7E, 0x0F, 0xE0, 0x02, 0x03, 0x68, 0x10,
+        0x00, 0x00,
+    ];
+    const FRESH_BATTERY_FULL: [u8; 15] =
+        [0xFF, 0x12, 0x05, 0xFE, 0x0C, 0x04, 0x1F, 0x0B, 0x01, 0x06, 0x05, 0xCF, 0x0F, 0x00, 0x00];
+    const READ_BATTERY: [u8; 13] =
+        [0xFF, 0x01, 0x00, 0xFE, 0x0C, 0x04, 0x1F, 0x0B, 0x01, 0x03, 0x05, 0xCC, 0x0E];
+
+    #[test]
+    fn a_fresh_reply_to_the_request_is_accepted() {
+        assert!(stinger_is_fresh(&FRESH_CONNECTIVITY, &STINGER_CONNECTIVITY));
+        assert!(stinger_is_fresh(&FRESH_BATTERY, &STINGER_BATTERY));
+        assert!(stinger_is_fresh(&FRESH_BATTERY_CHARGING, &STINGER_BATTERY));
+        assert!(stinger_is_fresh(&FRESH_BATTERY_FULL, &STINGER_BATTERY));
+    }
+
+    #[test]
+    fn a_reply_already_read_is_rejected() {
+        assert!(!stinger_is_fresh(&READ_CONNECTIVITY, &STINGER_CONNECTIVITY));
+        assert!(!stinger_is_fresh(&READ_BATTERY, &STINGER_BATTERY));
+        // What a fixed 20 ms wait got: the connectivity reply again after asking for the battery
+        assert!(!stinger_is_fresh(&READ_CONNECTIVITY, &STINGER_BATTERY));
+    }
+
+    #[test]
+    fn a_fresh_reply_to_another_request_is_rejected() {
+        // Its byte 11 is part of the voltage, which would look like "headset off"
+        assert!(!stinger_is_fresh(&FRESH_BATTERY, &STINGER_CONNECTIVITY));
+        assert!(!stinger_is_fresh(&FRESH_CONNECTIVITY, &STINGER_BATTERY));
+    }
+
+    #[test]
+    fn a_short_or_empty_reply_is_rejected() {
+        assert!(!stinger_is_fresh(&[], &STINGER_BATTERY));
+        assert!(!stinger_is_fresh(&FRESH_BATTERY[..5], &STINGER_BATTERY));
+    }
+
+    #[test]
+    fn battery_replies_are_parsed_as_captured() {
+        let (charge, mv) = stinger_reading(&FRESH_BATTERY).unwrap();
+        assert_eq!((charge, mv), (Charge::No, 3787));
+        let (charge, mv) = stinger_reading(&FRESH_BATTERY_CHARGING).unwrap();
+        assert_eq!((charge, mv), (Charge::Charging, 3966));
+        let (charge, mv) = stinger_reading(&FRESH_BATTERY_FULL).unwrap();
+        assert_eq!((charge, mv), (Charge::Full, 4047));
+        assert_eq!(stinger_battery(mv as f32 / 1000.0, charge), 100);
+        // The stale reply a fixed wait got has an unknown state in byte 9
+        assert_eq!(stinger_reading(&READ_CONNECTIVITY), None);
+        assert_eq!(stinger_reading(&FRESH_BATTERY[..12]), None);
     }
 }

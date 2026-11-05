@@ -46,7 +46,7 @@ directamente con los cascos, con el protocolo documentado en [docs/PROTOCOL.md](
 | HyperX Cloud Alpha Wireless | `0951:1743`, `0951:1765`, `03F0:098D` | Experimental: batería y carga, estado del micro, mic monitoring y su volumen, apagado automático, avisos de voz, cascos apagados; sin probar |
 | HyperX Cloud II Wireless DTS | `03F0:018B`, `03F0:0696`, `03F0:038B`, `03F0:058B` | Experimental: batería y carga, estado del micro, mic monitoring, apagado automático, cascos apagados; sin probar |
 | HyperX Cloud Flight Wireless | `0951:16C4`, `0951:1723`, `03F0:0E90` | Experimental: batería y carga, cascos apagados; sin probar |
-| HyperX Cloud Stinger Core Wireless | `0951:170B` | Experimental: batería y carga, cascos apagados; sin probar |
+| HyperX Cloud Stinger Core Wireless | `0951:170B` | Experimental: batería y carga, cascos apagados; confirmado en Linux, porcentaje aproximado |
 | HyperX Cloud III Wireless | `03F0:0C9D`, `03F0:05B7`, `03F0:0E9D`, `03F0:06B7` | Experimental: batería y carga, estado del micro, mic monitoring y su volumen, apagado automático, cascos apagados; sin probar |
 | HyperX Cloud II Core Wireless | `03F0:0995`, `03F0:069F` | Experimental: batería y carga, estado del micro, mic monitoring y su volumen, apagado automático, cascos apagados; sin probar |
 | HyperX Cloud Stinger 2 Wireless | `03F0:0D93` | Experimental: batería y carga, mic monitoring, apagado automático, cascos apagados; sin probar |
