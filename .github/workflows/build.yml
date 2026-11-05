@@ -15,10 +15,11 @@ env:
   RUST_VERSION: "1.99.1"
   # Linux release binary: linked against glibc 2.31 (Ubuntu 20.04, Debian 11 and newer)
   ZIG_VERSION: "0.14.1"
-  # From https://ziglang.org/download/index.json
-  ZIG_SHA256: "24aeeec8af16c381934a6cd7d95c807a8cb2cf7df9fa40d359aa884195c4716c"
   CARGO_ZIGBUILD_VERSION: "0.24.0"
   CARGO_DEB_VERSION: "3.8.0"
+  CARGO_GENERATE_RPM_VERSION: "0.21.1"
+  # Oldest Fedora the .rpm is installed on as a check
+  FEDORA_IMAGE: "fedora:44"
   # AppImage tools, checked against the SHA256 digests GitHub publishes for these release assets
   APPIMAGETOOL_URL: "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage"
   APPIMAGETOOL_SHA256: "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
@@ -79,9 +80,26 @@ jobs:
           if-no-files-found: error
 
   linux:
+    name: linux (${{ matrix.arch }})
     needs: version
-    runs-on: ubuntu-24.04
+    strategy:
+      # One architecture failing doesn't hide the result of the other
+      fail-fast: false
+      matrix:
+        include:
+          # zig_sha256: from https://ziglang.org/download/index.json
+          - arch: x86_64
+            runner: ubuntu-24.04
+            zig_sha256: "24aeeec8af16c381934a6cd7d95c807a8cb2cf7df9fa40d359aa884195c4716c"
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+            zig_sha256: "f7a654acc967864f7a050ddacfaa778c7504a0eca8d2b678839c21eea47c992b"
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
+    env:
+      ARCH: ${{ matrix.arch }}
+      TARGET: ${{ matrix.arch }}-unknown-linux-gnu
+      ZIG_SHA256: ${{ matrix.zig_sha256 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -93,9 +111,10 @@ jobs:
             ~/.cargo/git
             ~/.cargo/bin/cargo-zigbuild
             ~/.cargo/bin/cargo-deb
+            ~/.cargo/bin/cargo-generate-rpm
             target
-          key: linux-${{ env.RUST_VERSION }}-zigbuild${{ env.CARGO_ZIGBUILD_VERSION }}-deb${{ env.CARGO_DEB_VERSION }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: linux-${{ env.RUST_VERSION }}-zigbuild${{ env.CARGO_ZIGBUILD_VERSION }}-deb${{ env.CARGO_DEB_VERSION }}-
+          key: linux-${{ matrix.arch }}-${{ env.RUST_VERSION }}-zigbuild${{ env.CARGO_ZIGBUILD_VERSION }}-deb${{ env.CARGO_DEB_VERSION }}-rpm${{ env.CARGO_GENERATE_RPM_VERSION }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: linux-${{ matrix.arch }}-${{ env.RUST_VERSION }}-zigbuild${{ env.CARGO_ZIGBUILD_VERSION }}-deb${{ env.CARGO_DEB_VERSION }}-rpm${{ env.CARGO_GENERATE_RPM_VERSION }}-
       - name: System libraries
         run: |
           sudo apt-get update -qq
@@ -104,7 +123,7 @@ jobs:
         run: |
           rustup toolchain install "$RUST_VERSION" --profile minimal
           rustup default "$RUST_VERSION"
-          curl -sSfL "https://ziglang.org/download/$ZIG_VERSION/zig-x86_64-linux-$ZIG_VERSION.tar.xz" -o zig.tar.xz
+          curl -sSfL "https://ziglang.org/download/$ZIG_VERSION/zig-$ARCH-linux-$ZIG_VERSION.tar.xz" -o zig.tar.xz
           echo "$ZIG_SHA256  zig.tar.xz" | sha256sum -c -
           mkdir -p "$RUNNER_TEMP/zig" && tar -xJf zig.tar.xz -C "$RUNNER_TEMP/zig" --strip-components=1 && rm zig.tar.xz
           echo "$RUNNER_TEMP/zig" >> "$GITHUB_PATH"
@@ -113,14 +132,16 @@ jobs:
           cargo-zigbuild --version 2>/dev/null | grep -qF "$CARGO_ZIGBUILD_VERSION" \
             || cargo install --locked cargo-zigbuild --version "$CARGO_ZIGBUILD_VERSION"
           cargo deb --version 2>/dev/null | grep -qF "$CARGO_DEB_VERSION"             || cargo install --locked cargo-deb --version "$CARGO_DEB_VERSION"
+          cargo generate-rpm --version 2>/dev/null | grep -qF "$CARGO_GENERATE_RPM_VERSION" \
+            || cargo install --locked cargo-generate-rpm --version "$CARGO_GENERATE_RPM_VERSION"
       - name: Test
         run: cargo test --locked
       - name: Build (glibc ${{ env.GLIBC_TARGET }})
-        run: cargo zigbuild --release --locked --target "x86_64-unknown-linux-gnu.$GLIBC_TARGET"
+        run: cargo zigbuild --release --locked --target "$TARGET.$GLIBC_TARGET"
       - name: Check the newest glibc symbol
         run: |
           set -o pipefail
-          BIN=target/x86_64-unknown-linux-gnu/release/nogenuity
+          BIN="target/$TARGET/release/nogenuity"
           MAX=$(objdump -T "$BIN" | grep -o 'GLIBC_[0-9][0-9.]*' | sed 's/GLIBC_//' | sort -Vu | tail -1)
           echo "Newest glibc symbol: $MAX"
           if [ -z "$MAX" ]; then
@@ -133,7 +154,7 @@ jobs:
           fi
       - name: Libraries resolve on Ubuntu 20.04 (glibc 2.31)
         run: |
-          docker run --rm -v "$PWD/target/x86_64-unknown-linux-gnu/release/nogenuity:/nogenuity:ro" ubuntu:20.04 sh -ec '
+          docker run --rm -v "$PWD/target/$TARGET/release/nogenuity:/nogenuity:ro" ubuntu:20.04 sh -ec '
             export DEBIAN_FRONTEND=noninteractive
             for i in 1 2 3; do
               apt-get update -qq >/dev/null && apt-get install -y -qq libfontconfig1 >/dev/null && break
@@ -145,9 +166,38 @@ jobs:
       - name: Package
         run: |
           VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
-          sh packaging/linux/package.sh target/x86_64-unknown-linux-gnu/release/nogenuity "$VERSION" dist
-          cargo deb --no-build --no-strip --target x86_64-unknown-linux-gnu --output dist
+          sh packaging/linux/package.sh "target/$TARGET/release/nogenuity" "$VERSION" "$ARCH" dist
+          cargo deb --no-build --no-strip --target "$TARGET" --output dist
+          sh packaging/linux/rpm.sh "$TARGET" dist
+      - name: Check the .rpm on Fedora
+        run: |
+          docker run --rm -v "$PWD/dist:/dist:ro" "$FEDORA_IMAGE" sh -exc '
+            RPM=$(ls /dist/*.rpm)
+            rpm -qp --list "$RPM"
+            rpm -qp --requires "$RPM"
+            rpm -qp --recommends "$RPM"
+            rpm -qp --scripts "$RPM" | grep -q "udevadm trigger"
+            for i in 1 2 3; do
+              dnf install -y -q "$RPM" >/dev/null && break
+              echo "dnf failed (attempt $i), retrying"; sleep 10
+            done
+            rpm -q nogenuity
+            test -x /usr/bin/nogenuity
+            test -f /usr/share/applications/nogenuity.desktop
+            test -f /usr/share/icons/hicolor/256x256/apps/nogenuity.png
+            test -f /usr/share/icons/hicolor/scalable/apps/nogenuity.svg
+            test -f /usr/share/alsa-card-profile/mixer/paths/nogenuity-alpha-s-game.conf
+            test -f /usr/share/alsa-card-profile/mixer/profile-sets/nogenuity-alpha-s.conf
+            command -v pactl
+            RULE=/usr/lib/udev/rules.d/70-nogenuity.rules
+            grep -q "TAG+=\"uaccess\"" "$RULE"
+            if grep -q ", GROUP=\"plugdev\"" "$RULE"; then echo "::error::plugdev in the rule"; exit 1; fi
+            if ldd /usr/bin/nogenuity | grep "not found"; then echo "::error::Missing libraries"; exit 1; fi
+            dnf remove -y -q nogenuity >/dev/null
+            test ! -e /usr/bin/nogenuity
+            test ! -e "$RULE"'
       - name: AppImage
+        if: matrix.arch == 'x86_64'
         run: |
           VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
           T="$RUNNER_TEMP/appimage"; mkdir -p "$T"
@@ -156,8 +206,9 @@ jobs:
           echo "$APPIMAGETOOL_SHA256  $T/appimagetool" | sha256sum -c -
           echo "$APPIMAGE_RUNTIME_SHA256  $T/runtime" | sha256sum -c -
           chmod +x "$T/appimagetool"
-          sh packaging/linux/appimage.sh target/x86_64-unknown-linux-gnu/release/nogenuity "$VERSION" dist "$T/appimagetool" "$T/runtime"
+          sh packaging/linux/appimage.sh "target/$TARGET/release/nogenuity" "$VERSION" dist "$T/appimagetool" "$T/runtime"
       - name: Check the AppImage
+        if: matrix.arch == 'x86_64'
         run: |
           IMG=$(ls dist/*.AppImage)
           chmod +x "$IMG"
@@ -169,10 +220,11 @@ jobs:
           echo "AppImage OK: $(du -h "$IMG" | cut -f1)"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: linux
+          name: linux-${{ matrix.arch }}
           path: |
             dist/*.tar.gz
             dist/*.deb
+            dist/*.rpm
             dist/*.AppImage
           if-no-files-found: error
 
@@ -189,6 +241,12 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: |
+          sha256sum -- * > "$RUNNER_TEMP/SHA256SUMS"
+          mv "$RUNNER_TEMP/SHA256SUMS" SHA256SUMS
+          sha256sum -c SHA256SUMS
       - name: Draft release
         env:
           GH_TOKEN: ${{ github.token }}

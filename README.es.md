@@ -61,6 +61,8 @@ tienen un enlace **Enviar informe** que hace casi todo. **Vienen más modelos**:
 |---|---|
 | Windows 10 / 11, x64 | Probado en Windows 11 |
 | Linux, x86-64 (X11 o Wayland), glibc 2.31+ (Ubuntu 20.04, Debian 11 y posteriores) | Probado con los cascos de verdad en Ubuntu 26.04 (PipeWire) y Ubuntu 24.04 (WSL2 + usbipd, sin balance) |
+| Fedora 44 y posteriores, `.rpm` | Experimental: la CI instala y desinstala el paquete, aún sin probar con cascos de verdad |
+| Linux, ARM64 (`aarch64`), glibc 2.31+ | Experimental: la CI lo compila y pasa los tests, aún sin probar con cascos de verdad |
 
 ## Instalación en Windows
 
@@ -74,14 +76,19 @@ bandeja; para salir, clic derecho en el icono → *Salir*.
 
 ## Instalación en Linux
 
-**Ubuntu, Debian, Linux Mint, Pop!_OS:** descarga `nogenuity_<versión>-1_amd64.deb` desde
+**Ubuntu, Debian, Linux Mint, Pop!_OS:** descarga `nogenuity_<versión>-1_amd64.deb` (`arm64` en ARM) desde
 [Releases](../../releases) e instálalo con `sudo apt install ./nogenuity_*.deb`. Nada más: añade la entrada del
 menú y la regla udev, y los cascos funcionan sin desenchufarlos. `sudo apt remove nogenuity` lo quita.
 Si antes instalaste el tarball con `install.sh`, ejecuta primero su `uninstall.sh`; si no, el menú seguirá abriendo esa copia.
 
+**Fedora (experimental):** descarga `nogenuity-<versión>-1.x86_64.rpm` (`aarch64` en ARM) desde
+[Releases](../../releases) e instálalo con `sudo dnf install ./nogenuity-*.rpm`. Hace lo mismo que el `.deb`, y
+`sudo dnf remove nogenuity` lo quita. Vale la misma nota sobre `uninstall.sh`. No se actualiza solo: instala la versión
+nueva de la misma forma. En Bazzite, Silverblue y otras variantes atómicas, usa el AppImage.
+
 **Cualquier otra distribución** (tarball):
 
-1. Descarga `nogenuity-<versión>-linux-x86_64.tar.gz` desde [Releases](../../releases) y descomprímelo.
+1. Descarga `nogenuity-<versión>-linux-x86_64.tar.gz` (`aarch64` en ARM) desde [Releases](../../releases) y descomprímelo.
 2. Ejecuta `./install.sh` desde esa carpeta. Instala Nogenuity para tu usuario (sin root): `~/.local/bin/nogenuity`,
    la entrada del menú de aplicaciones y los iconos. Después ofrece instalar la regla udev que deja a tu
    usuario hablar con los cascos; esa parte pide tu contraseña una vez. `./uninstall.sh` lo quita todo.
@@ -98,12 +105,14 @@ Si falta la regla, la app lo avisa en su barra de estado.
 
 El icono de la bandeja usa StatusNotifierItem: funciona directamente en KDE Plasma y la mayoría de
 escritorios; en GNOME necesita la extensión *AppIndicator*. Sin bandeja, volver a abrir la app muestra la
-ventana. El balance usa `pactl` (PipeWire o PulseAudio), del paquete `pulseaudio-utils` en Debian y Ubuntu.
+ventana. El balance usa `pactl` (PipeWire o PulseAudio), del paquete `pulseaudio-utils` en Debian, Ubuntu y Fedora.
+
+Cada release incluye un archivo `SHA256SUMS`. Para comprobar una descarga: `sha256sum -c --ignore-missing SHA256SUMS`.
 
 ## Balance juego/chat en Linux
 
 El balance necesita dos salidas, Game y Chat. Con PipeWire, un Cloud Alpha S solo tiene una por defecto, así que el
-`.deb`, `install.sh` y el botón **Grant access** instalan también un perfil de PipeWire para estos cascos. Se aplica
+`.deb`, el `.rpm`, `install.sh` y el botón **Grant access** instalan también un perfil de PipeWire para estos cascos. Se aplica
 la próxima vez que los conectes. Esto cambia cómo configura el sistema su audio: en los ajustes de sonido aparecen
 entonces dos salidas, Game y Chat.
 
@@ -113,7 +122,7 @@ Para comprobarlo, `pactl list sinks short` debe mostrar `stereo-game-output` y `
   No se ha probado en otras distribuciones ni en versiones anteriores de PipeWire, y PulseAudio sin PipeWire no
   lee este perfil.
 - **Si diste permiso con una versión anterior:** ejecuta de nuevo `./install.sh` o instala el `.deb`.
-- **Para quitarlo** (el `.deb` quita sus propios archivos con `sudo apt remove nogenuity`):
+- **Para quitarlo** (el `.deb` y el `.rpm` quitan sus propios archivos al desinstalarlos):
   ```
   sudo rm /etc/udev/rules.d/70-nogenuity.rules
   sudo rm /etc/alsa-card-profile/mixer/paths/nogenuity-alpha-s-game.conf

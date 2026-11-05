@@ -1,14 +1,16 @@
 #!/bin/sh
-# Builds the Linux release tarball: package.sh <nogenuity binary> <version> <output dir>
+# Builds the Linux release tarball: package.sh <nogenuity binary> <version> <arch> <output dir>
+# (arch: x86_64 or aarch64, it goes in the file name)
 # Contents: the binary, install.sh / uninstall.sh, the menu entry, icons, the udev rule, the audio
 # profile and docs.
 set -eu
 
 BIN=$1
 VERSION=$2
-OUT=$3
+ARCH=$3
+OUT=$4
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-NAME="nogenuity-$VERSION-linux-x86_64"
+NAME="nogenuity-$VERSION-linux-$ARCH"
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 DIR="$STAGE/$NAME"

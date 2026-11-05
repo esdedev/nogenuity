@@ -59,6 +59,8 @@ that does most of the work. **More models are on the way** — see the [support 
 |---|---|
 | Windows 10 / 11, x64 | Tested on Windows 11 |
 | Linux, x86-64 (X11 or Wayland), glibc 2.31+ (Ubuntu 20.04, Debian 11 and newer) | Tested on Ubuntu 26.04 (PipeWire) and Ubuntu 24.04 (WSL2 + usbipd, no balance) with the real headset |
+| Fedora 44 and newer, `.rpm` | Experimental: CI installs and removes the package, not yet tried with a real headset |
+| Linux, ARM64 (`aarch64`), glibc 2.31+ | Experimental: CI builds it and runs the tests, not yet tried with a real headset |
 
 ## Install — Windows
 
@@ -73,14 +75,19 @@ tray icon → *Exit* to quit.
 
 ## Install — Linux
 
-**Ubuntu, Debian, Linux Mint, Pop!_OS:** download `nogenuity_<version>-1_amd64.deb` from
+**Ubuntu, Debian, Linux Mint, Pop!_OS:** download `nogenuity_<version>-1_amd64.deb` (`arm64` on ARM) from
 [Releases](../../releases) and install it with `sudo apt install ./nogenuity_*.deb`. That's all: it adds the
 menu entry and the udev rule, and the headset works without unplugging it. `sudo apt remove nogenuity` removes it.
 If you installed the tarball with `install.sh` before, run its `uninstall.sh` first, or the menu keeps opening that copy.
 
+**Fedora (experimental):** download `nogenuity-<version>-1.x86_64.rpm` (`aarch64` on ARM) from
+[Releases](../../releases) and install it with `sudo dnf install ./nogenuity-*.rpm`. It does the same as the `.deb`,
+and `sudo dnf remove nogenuity` removes it. The same note about `uninstall.sh` applies. It doesn't update on its own:
+install the new version the same way. On Bazzite, Silverblue and other atomic variants, use the AppImage.
+
 **Any other distribution** (tarball):
 
-1. Download `nogenuity-<version>-linux-x86_64.tar.gz` from [Releases](../../releases) and unpack it.
+1. Download `nogenuity-<version>-linux-x86_64.tar.gz` (`aarch64` on ARM) from [Releases](../../releases) and unpack it.
 2. Run `./install.sh` from that folder. It installs Nogenuity for your user (no root): `~/.local/bin/nogenuity`,
    the application menu entry and the icons. It then offers to install the udev rule that lets your user
    talk to the headset; that part needs your password once. `./uninstall.sh` removes everything again.
@@ -97,12 +104,14 @@ If the rule is missing, the app says so in its status bar.
 
 The tray icon uses StatusNotifierItem: it works out of the box on KDE Plasma and most desktops; on GNOME
 it needs the *AppIndicator* extension. Without a tray, running the app again shows the window. The balance
-slider uses `pactl` (PipeWire or PulseAudio), from the `pulseaudio-utils` package on Debian and Ubuntu.
+slider uses `pactl` (PipeWire or PulseAudio), from the `pulseaudio-utils` package on Debian, Ubuntu and Fedora.
+
+Each release includes a `SHA256SUMS` file. To check a download: `sha256sum -c --ignore-missing SHA256SUMS`.
 
 ## Game/chat balance on Linux
 
 The balance needs two outputs, Game and Chat. On PipeWire a Cloud Alpha S only gets one by default, so the
-`.deb`, `install.sh` and the **Grant access** button also install a PipeWire profile for this headset. It takes
+`.deb`, the `.rpm`, `install.sh` and the **Grant access** button also install a PipeWire profile for this headset. It takes
 effect the next time you plug the headset in. This changes how your system sets up its audio: in the sound
 settings it then appears as two outputs, Game and Chat.
 
@@ -112,7 +121,7 @@ To check it, `pactl list sinks short` should list `stereo-game-output` and `ster
   Other distributions and older PipeWire versions haven't been tried, and PulseAudio without PipeWire doesn't
   read this profile.
 - **If you granted access with an earlier version:** run `./install.sh` again, or install the `.deb`.
-- **To remove it** (the `.deb` removes its own files with `sudo apt remove nogenuity`):
+- **To remove it** (the `.deb` and the `.rpm` remove their own files when you uninstall them):
   ```
   sudo rm /etc/udev/rules.d/70-nogenuity.rules
   sudo rm /etc/alsa-card-profile/mixer/paths/nogenuity-alpha-s-game.conf
