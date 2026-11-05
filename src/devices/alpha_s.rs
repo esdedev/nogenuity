@@ -7,6 +7,7 @@
 //!   byte 5 is ignored, so to set a state it must be read first.
 //! - The EQ (module 30 2B AE) is only audible with 7.1 on.
 
+use std::ops::Range;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -49,6 +50,28 @@ const PARAM_STATUS: u8 = 0x09;
 const PARAM_SURROUND: u8 = 0x02;
 const PARAM_SIDETONE: u8 = 0x07;
 const DSP_SETTLE: Duration = Duration::from_millis(1500);
+
+// The packet for one EQ band: see "Equalizer" in docs/PROTOCOL.md.
+const EQ_KIND: u8 = 0x0D;
+/// Byte 4, which the ACK echoes.
+const EQ_COMMAND: u8 = 0x41;
+/// Byte 6 is this plus the channel, and the ACK echoes it too.
+const EQ_FIRST_CHANNEL: u8 = 4;
+const EQ_CHANNELS: u8 = 2;
+const EQ_BAND_INDEX: Range<usize> = 10..14;
+const EQ_FILTER: Range<usize> = 14..18;
+const EQ_FREQUENCY: Range<usize> = 18..22;
+const EQ_Q: Range<usize> = 22..26;
+const EQ_GAIN: Range<usize> = 26..30;
+
+/// Writes one band's values into its packet.
+fn write_eq_band(p: &mut [u8], index: usize, (hz, gain, q, filter): Band) {
+    p[EQ_BAND_INDEX].copy_from_slice(&(index as i32).to_le_bytes());
+    p[EQ_FILTER].copy_from_slice(&(filter as i32).to_le_bytes());
+    p[EQ_FREQUENCY].copy_from_slice(&(hz.round() as i32).to_le_bytes());
+    p[EQ_Q].copy_from_slice(&q8_23(q));
+    p[EQ_GAIN].copy_from_slice(&q8_23(gain));
+}
 
 struct AlphaS {
     model: &'static Model,
@@ -142,18 +165,14 @@ impl Headset for AlphaS {
                 std::thread::sleep(t - now);
             }
         }
-        let (hz, gain, q, kind) = band;
         let mut ok = true;
-        for channel in 0..2u8 {
-            let mut p = self.packet(0x0D, 0x41, MOD_EQ, 4 + channel);
-            p[10..14].copy_from_slice(&(index as i32).to_le_bytes());
-            p[14..18].copy_from_slice(&(kind as i32).to_le_bytes());
-            p[18..22].copy_from_slice(&(hz.round() as i32).to_le_bytes());
-            p[22..26].copy_from_slice(&q8_23(q));
-            p[26..30].copy_from_slice(&q8_23(gain));
+        for channel in 0..EQ_CHANNELS {
+            let target = EQ_FIRST_CHANNEL + channel;
+            let mut p = self.packet(EQ_KIND, EQ_COMMAND, MOD_EQ, target);
+            write_eq_band(&mut p, index, band);
             let _lock = self.link.lock()?;
             self.link.send(&p, REPORT_ID)?;
-            ok &= self.read_ack(0x41, 4 + channel).is_some();
+            ok &= self.read_ack(EQ_COMMAND, target).is_some();
         }
         Ok(ok)
     }
@@ -165,5 +184,28 @@ impl Headset for AlphaS {
                 return Some(ButtonEvent { surround: r[2] & 0x02 != 0, game_db: q8_8(&r, 6), chat_db: q8_8(&r, 10) });
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Against the table in docs/PROTOCOL.md: 1 kHz low shelf at Q 1, -3 dB, as band 3.
+    #[test]
+    fn eq_band_bytes() {
+        let mut p = vec![0u8; 62];
+        write_eq_band(&mut p, 3, (1000.0, -3.0, 1.0, 1));
+        assert_eq!(
+            p[10..30],
+            [
+                0x03, 0x00, 0x00, 0x00, // band index
+                0x01, 0x00, 0x00, 0x00, // filter
+                0xE8, 0x03, 0x00, 0x00, // frequency
+                0x00, 0x00, 0x80, 0x00, // Q 1.0, Q8.23
+                0x00, 0x00, 0x80, 0xFE, // gain -3.0, Q8.23
+            ]
+        );
+        assert!(p[30..].iter().all(|&b| b == 0));
     }
 }
