@@ -17,8 +17,8 @@ project.
 - On **Linux** there is one `/dev/hidrawN` per interface: pick the one whose `uevent` has
   `HID_ID=0003:00000951:000016ED` and `HID_PHYS=…/input5`. Write the report with `write()` and fetch the
   reply with the `HIDIOCGINPUT(len)` ioctl (kernel 5.11+); button reports arrive with `read()`.
-- Multi-byte integers are **little-endian**. EQ values use **Q8.23 fixed point** (`round(value * 2^23)`
-  as a signed 32-bit integer). Levels in the status reply are **Q8.8, big-endian**.
+- Multi-byte integers are **little-endian**. EQ values use **Q8.23 fixed point** (`value * 2^23` with the
+  fraction dropped, as a signed 32-bit integer). Levels in the status reply are **Q8.8, big-endian**.
 
 ## Control commands (module `68 4A 8E`)
 
