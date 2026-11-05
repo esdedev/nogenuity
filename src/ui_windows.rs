@@ -46,6 +46,7 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 use windows_numerics::Vector2;
 
 use crate::audio::GameChat;
+use crate::balance::Move;
 use crate::backend::{Backend, Cmd, Event};
 use crate::eq::{self, F_MAX, F_MIN, GAIN_LIMIT, PRESETS, Q_MAX, Q_MIN};
 use crate::devices::{self, Band, Model, Status};
@@ -608,11 +609,15 @@ impl App {
     // --- actions ---
     fn set_balance(&mut self, value: i32) {
         let Some(audio) = &self.audio else { return };
-        let Some(step) = crate::balance::step(value, self.settings.balance, self.settings.balance_base, audio.settled(), || audio.get()) else {
-            // Dropped, so a drag doesn't keep trying: the next status update looks for them again
-            self.audio = None;
-            self.log = t().no_outputs.into();
-            return;
+        let step = match crate::balance::step(value, self.settings.balance, self.settings.balance_base, audio.settled(), || audio.get()) {
+            Move::Stay => return,
+            Move::To(step) => step,
+            Move::Unreadable => {
+                // Dropped, so a drag doesn't keep trying: the next status update looks for them again
+                self.audio = None;
+                self.log = t().no_outputs.into();
+                return;
+            }
         };
         audio.set(step.levels.0, step.levels.1);
         self.settings.balance = step.value;
