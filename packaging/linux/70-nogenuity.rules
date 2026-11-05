@@ -48,3 +48,7 @@ SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="069f", TAG+="ua
 SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="089d", TAG+="uaccess", GROUP="plugdev", MODE="0660"
 SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="03cc", TAG+="uaccess", GROUP="plugdev", MODE="0660"
 SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="0ace", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+
+# Audio, not access: the profile that gives the Cloud Alpha S separate Game and Chat outputs on
+# PipeWire, which the game/chat balance needs. It is read when the headset is plugged in.
+SUBSYSTEM=="sound", ACTION=="change", KERNEL=="card*", ATTRS{idVendor}=="0951", ATTRS{idProduct}=="16ed", ENV{ACP_PROFILE_SET}="nogenuity-alpha-s.conf"
