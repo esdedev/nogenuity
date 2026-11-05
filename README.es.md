@@ -37,24 +37,29 @@ directamente con los cascos, con el protocolo documentado en [docs/PROTOCOL.md](
 
 ## Hardware compatible
 
-| Auricular | ID USB | Estado |
-|---|---|---|
-| HyperX Cloud Alpha S (con cable, caja de control USB) | `0951:16ED` | Probado, firmware `0x4110` |
-| HyperX Cloud Alpha S, ID de la época HP | `03F0:0C91` | Experimental: el mismo protocolo que el de arriba, sin probar |
-| HyperX Cloud Flight S | `0951:16EA` | Experimental: 7.1, EQ, mic monitoring, batería y carga; sin probar |
-| HyperX Cloud II Wireless | `0951:1718`, `03F0:0C8A` | Experimental: 7.1, EQ, mic monitoring, estado del micro, batería y carga; sin probar |
-| HyperX Cloud Alpha Wireless | `0951:1743`, `0951:1765`, `03F0:098D` | Experimental: batería y carga, estado del micro, mic monitoring y su volumen, apagado automático, avisos de voz, cascos apagados; sin probar |
-| HyperX Cloud II Wireless DTS | `03F0:018B`, `03F0:0696`, `03F0:038B`, `03F0:058B` | Experimental: batería y carga, estado del micro, mic monitoring, apagado automático, cascos apagados; sin probar |
-| HyperX Cloud Flight Wireless | `0951:16C4`, `0951:1723`, `03F0:0E90` | Experimental: batería y carga, cascos apagados; sin probar |
-| HyperX Cloud Stinger Core Wireless | `0951:170B` | Experimental: batería y carga, cascos apagados; confirmado en Linux, porcentaje aproximado |
-| HyperX Cloud III Wireless | `03F0:0C9D`, `03F0:05B7`, `03F0:0E9D`, `03F0:06B7` | Experimental: batería y carga, estado del micro, mic monitoring y su volumen, apagado automático, cascos apagados; sin probar |
-| HyperX Cloud II Core Wireless | `03F0:0995`, `03F0:069F` | Experimental: batería y carga, estado del micro, mic monitoring y su volumen, apagado automático, cascos apagados; sin probar |
-| HyperX Cloud Stinger 2 Wireless | `03F0:0D93` | Experimental: batería y carga, mic monitoring, apagado automático, cascos apagados; sin probar |
-| HyperX Cloud III (con cable) | `03F0:089D`, `03F0:03CC`, `03F0:0ACE` | Experimental: mic monitoring y su nivel; sin probar |
+| Auricular | ID USB | Windows | Linux | Funciones |
+|---|---|:-:|:-:|---|
+| HyperX Cloud Alpha S (con cable, caja de control USB) | `0951:16ED` | ✔ | ✔ | 7.1, EQ, mic monitoring, balance juego/chat, estado del micro; probado con el firmware `0x4110` |
+| HyperX Cloud Alpha S, ID de la época HP | `03F0:0C91` | — | — | El mismo protocolo que el de arriba |
+| HyperX Cloud Flight S | `0951:16EA` | — | — | 7.1, EQ, mic monitoring, batería y carga |
+| HyperX Cloud II Wireless | `0951:1718`, `03F0:0C8A` | — | — | 7.1, EQ, mic monitoring, estado del micro, batería y carga |
+| HyperX Cloud Alpha Wireless | `0951:1743`, `0951:1765`, `03F0:098D` | — | — | Batería y carga, estado del micro, mic monitoring y su volumen, apagado automático, avisos de voz, cascos apagados |
+| HyperX Cloud II Wireless DTS | `03F0:018B`, `03F0:0696`, `03F0:038B`, `03F0:058B` | — | — | Batería y carga, estado del micro, mic monitoring, apagado automático, cascos apagados |
+| HyperX Cloud Flight Wireless | `0951:16C4`, `0951:1723`, `03F0:0E90` | — | — | Batería y carga, cascos apagados |
+| HyperX Cloud Stinger Core Wireless | `0951:170B` | — | ⚠️ | Batería y carga, cascos apagados |
+| HyperX Cloud III Wireless | `03F0:0C9D`, `03F0:05B7`, `03F0:0E9D`, `03F0:06B7` | — | — | Batería y carga, estado del micro, mic monitoring y su volumen, apagado automático, cascos apagados |
+| HyperX Cloud II Core Wireless | `03F0:0995`, `03F0:069F` | — | — | Batería y carga, estado del micro, mic monitoring y su volumen, apagado automático, cascos apagados |
+| HyperX Cloud Stinger 2 Wireless | `03F0:0D93` | — | — | Batería y carga, mic monitoring, apagado automático, cascos apagados |
+| HyperX Cloud III (con cable) | `03F0:089D`, `03F0:03CC`, `03F0:0ACE` | — | — | Mic monitoring y su nivel |
 
-**Experimental** quiere decir que el modelo está hecho pero nadie lo ha confirmado aún con unos cascos de
-verdad. Si tienes uno, [ayuda a probarlo](CONTRIBUTING.md#testing-a-headset): los modelos experimentales
-tienen un enlace **Enviar informe** que hace casi todo. **Vienen más modelos**: mira el
+- ✔ Confirmado con unos cascos de verdad en ese sistema.
+- ⚠️ Funciona, con una limitación conocida. En la Cloud Stinger Core Wireless el porcentaje de batería es
+  aproximado, y poco fiable mientras carga.
+- — Implementado, pero aún sin probar en ese sistema.
+
+La app muestra la etiqueta **EXPERIMENTAL** en los modelos que no están del todo confirmados, en los dos
+sistemas. Si tienes uno, [ayuda a probarlo](CONTRIBUTING.md#testing-a-headset): esos modelos tienen un enlace
+**Enviar informe** que hace casi todo. **Vienen más modelos**: mira el
 [catálogo de compatibilidad](docs/DEVICES.md).
 
 | Sistema | Estado |

@@ -36,24 +36,29 @@ the headset directly, using the protocol documented in [docs/PROTOCOL.md](docs/P
 
 ## Supported hardware
 
-| Headset | USB ID | Status |
-|---|---|---|
-| HyperX Cloud Alpha S (wired, USB control box) | `0951:16ED` | Tested, firmware `0x4110` |
-| HyperX Cloud Alpha S, HP-era ID | `03F0:0C91` | Experimental: same protocol as the one above, not tested yet |
-| HyperX Cloud Flight S | `0951:16EA` | Experimental: 7.1, EQ, mic monitoring, battery and charging; not tested yet |
-| HyperX Cloud II Wireless | `0951:1718`, `03F0:0C8A` | Experimental: 7.1, EQ, mic monitoring, mute status, battery and charging; not tested yet |
-| HyperX Cloud Alpha Wireless | `0951:1743`, `0951:1765`, `03F0:098D` | Experimental: battery and charging, mic mute status, mic monitoring and its level, auto power-off, voice prompts, headset off; not tested yet |
-| HyperX Cloud II Wireless DTS | `03F0:018B`, `03F0:0696`, `03F0:038B`, `03F0:058B` | Experimental: battery and charging, mic mute status, mic monitoring, auto power-off, headset off; not tested yet |
-| HyperX Cloud Flight Wireless | `0951:16C4`, `0951:1723`, `03F0:0E90` | Experimental: battery and charging, headset off; not tested yet |
-| HyperX Cloud Stinger Core Wireless | `0951:170B` | Experimental: battery and charging, headset off; confirmed on Linux, percentage approximate |
-| HyperX Cloud III Wireless | `03F0:0C9D`, `03F0:05B7`, `03F0:0E9D`, `03F0:06B7` | Experimental: battery and charging, mic mute status, mic monitoring and its level, auto power-off, headset off; not tested yet |
-| HyperX Cloud II Core Wireless | `03F0:0995`, `03F0:069F` | Experimental: battery and charging, mic mute status, mic monitoring and its level, auto power-off, headset off; not tested yet |
-| HyperX Cloud Stinger 2 Wireless | `03F0:0D93` | Experimental: battery and charging, mic monitoring, auto power-off, headset off; not tested yet |
-| HyperX Cloud III (wired) | `03F0:089D`, `03F0:03CC`, `03F0:0ACE` | Experimental: mic monitoring and its level; not tested yet |
+| Headset | USB ID | Windows | Linux | Features |
+|---|---|:-:|:-:|---|
+| HyperX Cloud Alpha S (wired, USB control box) | `0951:16ED` | ✔ | ✔ | 7.1, EQ, mic monitoring, game/chat balance, mic mute status; tested on firmware `0x4110` |
+| HyperX Cloud Alpha S, HP-era ID | `03F0:0C91` | — | — | Same protocol as the one above |
+| HyperX Cloud Flight S | `0951:16EA` | — | — | 7.1, EQ, mic monitoring, battery and charging |
+| HyperX Cloud II Wireless | `0951:1718`, `03F0:0C8A` | — | — | 7.1, EQ, mic monitoring, mute status, battery and charging |
+| HyperX Cloud Alpha Wireless | `0951:1743`, `0951:1765`, `03F0:098D` | — | — | Battery and charging, mic mute status, mic monitoring and its level, auto power-off, voice prompts, headset off |
+| HyperX Cloud II Wireless DTS | `03F0:018B`, `03F0:0696`, `03F0:038B`, `03F0:058B` | — | — | Battery and charging, mic mute status, mic monitoring, auto power-off, headset off |
+| HyperX Cloud Flight Wireless | `0951:16C4`, `0951:1723`, `03F0:0E90` | — | — | Battery and charging, headset off |
+| HyperX Cloud Stinger Core Wireless | `0951:170B` | — | ⚠️ | Battery and charging, headset off |
+| HyperX Cloud III Wireless | `03F0:0C9D`, `03F0:05B7`, `03F0:0E9D`, `03F0:06B7` | — | — | Battery and charging, mic mute status, mic monitoring and its level, auto power-off, headset off |
+| HyperX Cloud II Core Wireless | `03F0:0995`, `03F0:069F` | — | — | Battery and charging, mic mute status, mic monitoring and its level, auto power-off, headset off |
+| HyperX Cloud Stinger 2 Wireless | `03F0:0D93` | — | — | Battery and charging, mic monitoring, auto power-off, headset off |
+| HyperX Cloud III (wired) | `03F0:089D`, `03F0:03CC`, `03F0:0ACE` | — | — | Mic monitoring and its level |
 
-**Experimental** means the model is implemented but nobody has confirmed it on a real headset yet. If you
-own one, [help test it](CONTRIBUTING.md#testing-a-headset): an experimental model has a **Send report** link
-that does most of the work. **More models are on the way** — see the [support catalog](docs/DEVICES.md).
+- ✔ Confirmed with a real headset on that system.
+- ⚠️ Works, with a known limitation. On the Cloud Stinger Core Wireless the battery percentage is approximate,
+  and unreliable while charging.
+- — Implemented, but not tried yet on that system.
+
+The app shows an **EXPERIMENTAL** badge on any model that isn't fully confirmed, on both systems. If you own
+one, [help test it](CONTRIBUTING.md#testing-a-headset): those models have a **Send report** link that does most
+of the work. **More models are on the way** — see the [support catalog](docs/DEVICES.md).
 
 | System | Status |
 |---|---|
