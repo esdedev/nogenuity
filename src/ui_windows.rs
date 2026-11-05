@@ -383,7 +383,7 @@ impl App {
         let model = settings.model.as_deref().and_then(devices::find);
         let layout = model.map_or_else(Layout::before_connect, |m| Layout::for_caps(&m.caps));
         let audio = model.and_then(|m| m.caps.game_chat_outputs).and_then(GameChat::find);
-        let win_levels = audio.as_ref().map_or((0.0, 0.0), |a| a.get());
+        let win_levels = audio.as_ref().and_then(GameChat::get).unwrap_or((0.0, 0.0));
         let n = 220;
         let freqs: Vec<f32> = (0..n).map(|i| F_MIN * (F_MAX / F_MIN).powf(i as f32 / (n - 1) as f32)).collect();
         let curve = eq::response_db(&settings.eq, &freqs);
@@ -581,8 +581,8 @@ impl App {
                     if self.audio.is_none() {
                         self.audio = self.outputs().and_then(GameChat::find);
                     }
-                    if let Some(a) = &self.audio {
-                        self.win_levels = a.get();
+                    if let Some(levels) = self.audio.as_ref().and_then(GameChat::get) {
+                        self.win_levels = levels;
                     }
                 }
                 Event::Button(b) => {
@@ -608,12 +608,19 @@ impl App {
         let value = if value.abs() < 6 { 0 } else { value.clamp(-100, 100) };
         let Some(audio) = &self.audio else { return };
         if self.settings.balance_base.is_none() || (self.settings.balance == 0 && value != 0) {
-            self.settings.balance_base = Some(audio.get());
+            // Without the current volumes there's nothing to work the new ones out from
+            let Some(base) = audio.get() else {
+                self.log = t().no_outputs.into();
+                return;
+            };
+            self.settings.balance_base = Some(base);
         }
         let (bg, bc) = self.settings.balance_base.unwrap();
         audio.set(bg * (1.0 - value.max(0) as f32 / 100.0), bc * (1.0 - (-value).max(0) as f32 / 100.0));
         self.settings.balance = value;
-        self.win_levels = audio.get();
+        if let Some(levels) = audio.get() {
+            self.win_levels = levels;
+        }
         self.schedule_save();
     }
 

@@ -42,13 +42,10 @@ impl GameChat {
         }
     }
 
-    pub fn get(&self) -> (f32, f32) {
-        unsafe {
-            (
-                self.game.GetMasterVolumeLevelScalar().unwrap_or(0.0),
-                self.chat.GetMasterVolumeLevelScalar().unwrap_or(0.0),
-            )
-        }
+    /// The current volumes, or `None` if they can't be read. Not reading them says nothing about
+    /// what they are, so it mustn't be taken for a volume of zero.
+    pub fn get(&self) -> Option<(f32, f32)> {
+        unsafe { Some((self.game.GetMasterVolumeLevelScalar().ok()?, self.chat.GetMasterVolumeLevelScalar().ok()?)) }
     }
 
     pub fn set(&self, game: f32, chat: f32) {
